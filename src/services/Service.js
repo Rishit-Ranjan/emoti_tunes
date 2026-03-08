@@ -236,7 +236,7 @@ export const detectEmotionFromImage = async (base64ImageData) => {
             throw new Error("The AI analyzed the image, but its response was in an unexpected format.");
         }
         if (parsed && typeof parsed.emotion === 'string') {
-            // Validate that the emotion is one of the expected values
+            
             console.log("Image Feature Analysis: ", parsed_analysis);
             return parsed.emotion;
         }
