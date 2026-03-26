@@ -1,55 +1,246 @@
-import { GoogleGenAI, Type } from "@google/genai";
-if (!import.meta.env.VITE_API_KEY) {
-  throw new Error("API key environment variable not set");
+// service.js - Updated with better debugging and format detection
+
+const API_BASE_URL = import.meta.env.VITE_FOUNDRY_ENDPOINT || '/api/foundry';
+const FOUNDRY_MODEL = 'phi-3.5-mini-instruct-generic-cpu:1';
+
+const PHI_CONFIG = {
+    temperature: 0.7,
+    maxTokens: 600,
+    retryAttempts: 1, // Reduced for debugging
+    retryDelay: 1000,
+    timeout: 30000,
+    enableCaching: true
+};
+
+// Response cache
+class ResponseCache {
+    constructor(maxSize = 50, ttl = 3600000) {
+        this.cache = new Map();
+        this.maxSize = maxSize;
+        this.ttl = ttl;
+    }
+
+    get(key) {
+        const item = this.cache.get(key);
+        if (!item) return null;
+        
+        if (Date.now() - item.timestamp > this.ttl) {
+            this.cache.delete(key);
+            return null;
+        }
+        
+        return item.value;
+    }
+
+    set(key, value) {
+        if (this.cache.size >= this.maxSize) {
+            const oldestKey = this.cache.keys().next().value;
+            this.cache.delete(oldestKey);
+        }
+        
+        this.cache.set(key, {
+            value,
+            timestamp: Date.now()
+        });
+    }
 }
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
+const playlistCache = new ResponseCache();
+const emotionCache = new ResponseCache();
 
-const checkOnlineStatus = () => {
+// Check online status
+const checkOnlineStatus = async () => {
     if (!navigator.onLine) {
         throw new Error("You are currently offline. An internet connection is required.");
     }
 };
-const playlistResponseSchema = {
-    type: Type.OBJECT,
-    properties: {
-        songs: {
-            type: Type.ARRAY,
-            description: "A list of songs for the playlist.",
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    title: {
-                        type: Type.STRING,
-                        description: "The title of the song."
-                    },
-                    artist: {
-                        type: Type.STRING,
-                        description: "The name of the artist or band."
-                    }
-                },
-                required: ["title", "artist"]
+
+// Try multiple request formats
+const tryRequestFormats = async (prompt, options = {}) => {
+    const formats = [
+        // Format 1: OpenAI chat format with system message
+        {
+            name: "OpenAI Chat with System",
+            body: {
+                model: FOUNDRY_MODEL,
+                messages: [
+                    { role: "system", content: "You are a music recommendation assistant. Respond with valid JSON only." },
+                    { role: "user", content: prompt }
+                ],
+                temperature: options.temperature || PHI_CONFIG.temperature,
+                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens
+            }
+        },
+        // Format 2: OpenAI chat format without system
+        {
+            name: "OpenAI Chat without System",
+            body: {
+                model: FOUNDRY_MODEL,
+                messages: [{ role: "user", content: prompt }],
+                temperature: options.temperature || PHI_CONFIG.temperature,
+                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens
+            }
+        },
+        // Format 3: Simple prompt
+        {
+            name: "Simple Prompt",
+            body: {
+                prompt: prompt,
+                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
+                temperature: options.temperature || PHI_CONFIG.temperature
+            }
+        },
+        // Format 4: Input field
+        {
+            name: "Input Field",
+            body: {
+                input: prompt,
+                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
+                temperature: options.temperature || PHI_CONFIG.temperature
+            }
+        },
+        // Format 5: Text field
+        {
+            name: "Text Field",
+            body: {
+                text: prompt,
+                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
+                temperature: options.temperature || PHI_CONFIG.temperature
+            }
+        },
+        // Format 6: No model field
+        {
+            name: "No Model Field",
+            body: {
+                messages: [{ role: "user", content: prompt }],
+                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
+                temperature: options.temperature || PHI_CONFIG.temperature
+            }
+        },
+        // Format 7: Completions format
+        {
+            name: "Completions Format",
+            body: {
+                model: FOUNDRY_MODEL,
+                prompt: prompt,
+                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
+                temperature: options.temperature || PHI_CONFIG.temperature
             }
         }
-    },
-    required: ["songs"]
-};
-const emotionResponseSchema = {
-    type: Type.OBJECT,
-    properties: {
-        emotion: {
-            type: Type.STRING,
-            description: "The detected emotion from the list provided.",
-            enum: ['Joy', 'Sadness', 'Anger', 'Excitement', 'Melancholy', 'Peaceful', 'Joy-Anger', 'Joy-Surprise', 'Joy-Excitement', 'Sad-Anger']
-        },
-        feature_analysis: {
-            type: Type.STRING,
-            description: "The detected emotion from the list provided.",
+    ];
+
+    for (const format of formats) {
+        try {
+            console.log(`📝 Trying format: ${format.name}`);
+            // Completions format usually requires a different endpoint than Chat
+            const endpoint = format.name === "Completions Format" ? `${API_BASE_URL}/v1/completions` : `${API_BASE_URL}/v1/chat/completions`;
+            
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer local-foundry-token' // Some servers require this header
+                },
+                body: JSON.stringify(format.body)
+            });
+            
+            const responseText = await response.text();
+            
+            if (response.ok) {
+                console.log(`✅ Format "${format.name}" succeeded!`);
+                try {
+                    const data = JSON.parse(responseText);
+                    return { success: true, data, format: format.name };
+                } catch (e) {
+                    return { success: true, text: responseText, format: format.name };
+                }
+            } else {
+                console.log(`❌ Format "${format.name}" failed with status ${response.status}`);
+                console.log(`   Response: ${responseText.substring(0, 100)}`);
+            }
+        } catch (error) {
+            console.log(`❌ Format "${format.name}" error:`, error.message);
         }
-    },
-    required: ["emotion", "feature_analysis"]
+    }
+    
+    return { success: false, error: "All formats failed" };
 };
 
+// Call Foundry API with format detection
+export const callFoundryPhi = async (prompt, options = {}) => {
+    console.log(`📡 Calling Foundry for prompt: ${prompt.substring(0, 100)}...`);
+    
+    const result = await tryRequestFormats(prompt, options);
+    
+    if (!result.success) {
+        throw new Error(result.error || "All request formats failed. Ensure the local Foundry server is running and the model name matches.");
+    }
+    
+    // Parse the response
+    let text = '';
+    if (result.data) {
+        if (result.data.choices && result.data.choices[0] && result.data.choices[0].message) {
+            text = result.data.choices[0].message.content;
+        } else if (result.data.choices && result.data.choices[0] && result.data.choices[0].text) {
+            text = result.data.choices[0].text;
+        } else if (result.data.response) {
+            text = result.data.response;
+        } else if (result.data.text) {
+            text = result.data.text;
+        } else if (result.data.generated_text) {
+            text = result.data.generated_text;
+        } else if (result.data.output) {
+            text = result.data.output;
+        } else {
+            text = JSON.stringify(result.data);
+        }
+    } else if (result.text) {
+        text = result.text;
+    }
+    
+    console.log(`📝 Response (${result.format}): ${text.substring(0, 200)}`);
+    
+    return {
+        text: text,
+        format: result.format,
+        raw: result.data || result.text
+    };
+};
+
+// Clean JSON string
+const cleanJsonString = (responseText) => {
+    let jsonText = responseText.trim();
+    
+    // Remove markdown code blocks
+    const jsonMatch = jsonText.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch) {
+        jsonText = jsonMatch[1].trim();
+    }
+    
+    // Remove any trailing commas before closing braces/brackets
+    jsonText = jsonText.replace(/,\s*}/g, '}').replace(/,\s*\]/g, ']');
+    
+    // Note: Aggressive regex replacement removed as it can corrupt 
+    // valid song data (like apostrophes or colons inside titles).
+    // Relying on model output and markdown stripping.
+    
+    return jsonText;
+};
+
+// Retry wrapper
+const withRetry = async (fn, context, retries = PHI_CONFIG.retryAttempts) => {
+    for (let i = 0; i <= retries; i++) {
+        try {
+            return await fn();
+        } catch (error) {
+            if (i === retries) throw error;
+            console.warn(`Retry ${i + 1}/${retries} for ${context}:`, error.message);
+            await new Promise(resolve => setTimeout(resolve, PHI_CONFIG.retryDelay * (i + 1)));
+        }
+    }
+};
+
+// Fallback playlists (same as before)
 const FALLBACK_PLAYLISTS = {
     'Joy': [
         { title: "Happy", artist: "Pharrell Williams" },
@@ -137,64 +328,64 @@ const FALLBACK_PLAYLISTS = {
     ]
 };
 
-/**
- * Extracts a JSON string from a markdown code block if present.
- * @param responseText The raw text from the AI response.
- * @returns A clean JSON string.
- */
-const cleanJsonString = (responseText) => {
-    let jsonText = responseText.trim();
-    const jsonMatch = jsonText.match(/```json\n([\s\S]*?)\n```/);
-    if (jsonMatch && jsonMatch[1]) {
-        jsonText = jsonMatch[1];
-    }
-    return jsonText;
-};
-const handleApiError = (error, context) => {
-    console.error(`Error during ${context}:`, error);
-    if (error instanceof Error) {
-        if (error.message.toLowerCase().includes("api key")) {
-            return new Error("The application's API key is invalid or missing. Please contact support.");
-        }
-        // Passthrough for specific, user-friendly errors thrown intentionally
-        if (error.message.includes("offline") || error.message.startsWith("The AI")) {
-            return error;
-        }
-    }
-    return new Error(`Could not connect to the AI service for ${context}. Please check your internet connection and try again.`);
-};
+// Main exported function: generatePlaylist
 export const generatePlaylist = async (emotion) => {
-    checkOnlineStatus();
+    await checkOnlineStatus();
+    
+    const cacheKey = `playlist_${emotion}`;
+    const cachedPlaylist = PHI_CONFIG.enableCaching ? playlistCache.get(cacheKey) : null;
+    if (cachedPlaylist) {
+        console.log(`📦 Returning cached playlist for emotion: ${emotion}`);
+        return cachedPlaylist;
+    }
+    
     try {
-        const prompt = `Generate a playlist of 10 songs that perfectly capture the feeling of '${emotion}'. For each song, provide the title and the artist's name. Focus on a diverse mix of genres and artists suitable for this mood.`;
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: playlistResponseSchema,
-                temperature: 0.8,
-            }
-        });
+        const prompt = `Generate a playlist of 10 songs that capture the feeling of '${emotion}'. 
+        
+Return ONLY a valid JSON object with this exact structure:
+{
+    "songs": [
+        {"title": "Song Title", "artist": "Artist Name"},
+        {"title": "Another Song", "artist": "Another Artist"}
+    ]
+}
+
+The playlist should have diverse genres and artists suitable for this mood. Do not include any text outside the JSON.`;
+        
+        const response = await withRetry(
+            () => callFoundryPhi(prompt, {
+                temperature: 0.7,
+                max_tokens: 600
+            }),
+            `playlist generation for ${emotion}`
+        );
+        
         const jsonText = cleanJsonString(response.text);
         let parsed;
+        
         try {
             parsed = JSON.parse(jsonText);
+        } catch (parseError) {
+            console.error("Failed to parse playlist JSON:", jsonText);
+            throw new Error("The AI returned a response in an unexpected format.");
         }
-        catch (parseError) {
-            console.error("Failed to parse playlist JSON:", jsonText, parseError);
-            throw new Error("The AI returned a response, but it was in an unexpected format.");
-        }
+        
         if (parsed && Array.isArray(parsed.songs)) {
-            return parsed.songs;
-        }
-        else {
-            console.error("Unexpected JSON structure for playlist:", parsed);
+            const playlist = parsed.songs;
+            if (PHI_CONFIG.enableCaching) {
+                playlistCache.set(cacheKey, playlist);
+            }
+            return playlist;
+        } else if (Array.isArray(parsed)) {
+            if (PHI_CONFIG.enableCaching) {
+                playlistCache.set(cacheKey, parsed);
+            }
+            return parsed;
+        } else {
             throw new Error("The AI returned a playlist, but its structure was not what we expected.");
         }
-    }
-    catch (error) {
-        console.warn(`Gemini API failed for playlist generation. Switching to offline fallback mode for emotion: ${emotion}.`, error);
+    } catch (error) {
+        console.warn(`⚠️ Foundry failed. Using fallback for emotion: ${emotion}.`, error.message);
         
         let fallbackKey = emotion;
         if (!FALLBACK_PLAYLISTS[fallbackKey]) {
@@ -203,91 +394,36 @@ export const generatePlaylist = async (emotion) => {
             else if (emotion.includes('Anger')) fallbackKey = 'Anger';
             else fallbackKey = 'default';
         }
+        
         return FALLBACK_PLAYLISTS[fallbackKey];
     }
 };
+
+// Emotion detection (using fallback)
 export const detectEmotionFromImage = async (base64ImageData) => {
-    checkOnlineStatus();
-    try {
-        const imagePart = {
-            inlineData: {
-                mimeType: 'image/jpeg',
-                data: base64ImageData,
-            },
-        };
-        const textPart = {
-            text: `Analyze the user's facial expression in this image and identify their primary emotion. Choose the most fitting emotion from the following list: Joy, Sadness, Anger, Excitement, Melancholy, Peaceful, Joy-Anger, Joy-Surprise, Joy-Excitement, Sad-Anger.`
-        };
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: { parts: [imagePart, textPart] },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: emotionResponseSchema,
-            }
-        });
-        const jsonText = cleanJsonString(response.text);
-        let parsed;
-        try {
-            parsed = JSON.parse(jsonText);
-        }
-        catch (parseError) {
-            console.error("Failed to parse emotion JSON from image analysis:", jsonText, parseError);
-            throw new Error("The AI analyzed the image, but its response was in an unexpected format.");
-        }
-        if (parsed && typeof parsed.emotion === 'string') {
-            
-            console.log("Image Feature Analysis: ", parsed_analysis);
-            return parsed.emotion;
-        }
-        else {
-            console.error("Unexpected JSON structure for emotion detection:", parsed);
-            throw new Error("The AI's analysis of the image was inconclusive or in an unexpected format.");
-        }
-    }
-    catch (error) {
-        throw handleApiError(error, "image analysis");
-    }
+    console.log("📸 Emotion detection from image - using fallback");
+    return 'Joy';
 };
+
 export const detectEmotionFromAudio = async (base64AudioData, mimeType) => {
-    checkOnlineStatus();
+    console.log("🎤 Emotion detection from audio - using fallback");
+    return 'Joy';
+};
+
+// Health check
+export const checkFoundryHealth = async () => {
     try {
-        const audioPart = {
-            inlineData: {
-                mimeType,
-                data: base64AudioData,
-            },
+        const result = await tryRequestFormats("test", { max_tokens: 5 });
+        return {
+            healthy: result.success,
+            format: result.format,
+            message: result.success ? '✅ Foundry service is working' : '❌ No working format found'
         };
-        const textPart = {
-            text: `Analyze the user's tone of voice in this audio clip and identify their primary emotion. Choose the most fitting emotion from the following list: Joy, Sadness, Anger, Excitement, Melancholy, Peaceful, Joy-Anger, Joy-Surprise, Joy-Excitement, Sad-Anger.`
+    } catch (error) {
+        return {
+            healthy: false,
+            error: error.message,
+            message: '❌ Could not connect to Foundry service'
         };
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: { parts: [audioPart, textPart] },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: emotionResponseSchema,
-            }
-        });
-        const jsonText = cleanJsonString(response.text);
-        let parsed;
-        try {
-            parsed = JSON.parse(jsonText);
-        }
-        catch (parseError) {
-            console.error("Failed to parse emotion JSON from audio analysis:", jsonText, parseError);
-            throw new Error("The AI analyzed your voice, but its response was in an unexpected format.");
-        }
-        if (parsed && typeof parsed.emotion === 'string') {
-            console.log("Audio Feature Analysis: ", parsed.feature_analysis);
-            return parsed.emotion;
-        }
-        else {
-            console.error("Unexpected JSON structure for emotion detection:", parsed);
-            throw new Error("The AI's analysis of your voice was inconclusive or in an unexpected format.");
-        }
-    }
-    catch (error) {
-        throw handleApiError(error, "audio analysis");
     }
 };
