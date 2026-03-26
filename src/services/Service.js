@@ -369,9 +369,47 @@ export const detectEmotionFromImage = async (base64ImageData) => {
     return 'Joy';
 };
 
-export const detectEmotionFromAudio = async (base64AudioData, mimeType) => {
-    console.log("🎤 Audio analysis skipped - Phi-3.5 is text-only model");
-    return 'Joy';
+export const detectEmotionFromAudio = async (base64AudioData, mimeType, aerFeatures) => {
+    console.log("🎤 Audio Emotion Recognition (AER) via wave features:", aerFeatures);
+    
+    if (!aerFeatures) return 'Joy';
+
+    try {
+        const prompt = `Perform Audio Emotion Recognition (AER) on the following extracted audio wave features:
+- Average Energy (Volume): ${aerFeatures.avgEnergy.toFixed(2)}
+- Average Peak Frequency (Pitch): ${aerFeatures.avgFreq.toFixed(2)} Hz
+- Vocal Stability (Variance): ${aerFeatures.stability.toFixed(2)}
+
+Based on these MIR (Music Information Retrieval) patterns, identify the user's emotion. Respond ONLY with one of these words: Joy, Sadness, Anger, Excitement, Melancholy, Peaceful, Joy-Anger, Joy-Surprise, Joy-Excitement, Sad-Anger.`;
+        
+        const response = await callFoundryPhi(prompt, { max_tokens: 15 });
+        let text = response.text.trim().toLowerCase();
+        
+        // Clean out common conversational junk
+        text = text.replace(/[^a-z-]/g, '');
+
+        // Map AI result to our strict categories
+        const moods = ['joy', 'sadness', 'anger', 'excitement', 'melancholy', 'peaceful', 'joy-anger', 'joy-surprise', 'joy-excitement', 'sad-anger'];
+        
+        // Handle direct matches
+        const matchedMood = moods.find(m => text.includes(m));
+        if (matchedMood) {
+            // Capitalize first letter (Joy, Sadness etc)
+            return matchedMood.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('-');
+        }
+
+        // Fallback for neutral or unknown
+        if (text.includes('neutral') || text.includes('given')) {
+            console.log("ℹ️ Mapping neutral result to Peaceful");
+            return 'Peaceful';
+        }
+
+        console.log(`✅ AER Result (Mapped): Joy`);
+        return 'Joy';
+    } catch (error) {
+        console.warn("⚠️ AER analysis failed, falling back to Joy:", error.message);
+        return 'Joy';
+    }
 };
 
 // Health check

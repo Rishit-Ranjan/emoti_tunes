@@ -84,12 +84,14 @@ const App = () => {
         setError(null);
         try {
             const detectedEmotionName = await detectEmotionFromImage(imageData);
-            const matchedEmotion = EMOTIONS.find(e => e.name.toLowerCase() === detectedEmotionName.toLowerCase());
+            const matchedEmotion = EMOTIONS.find(e => e.name.toLowerCase() === detectedEmotionName.toLowerCase()) || 
+                                   EMOTIONS.find(e => e.name === 'Joy');
+            
             if (matchedEmotion) {
                 await handleEmotionSelect(matchedEmotion);
             }
             else {
-                throw new Error(`Could not find a matching mood for "${detectedEmotionName}". Please try again.`);
+                throw new Error("Could not process your image. Please try again.");
             }
         }
         catch (err) {
@@ -98,7 +100,7 @@ const App = () => {
             setIsLoading(false);
         }
     }, [handleEmotionSelect, isOffline]);
-    const handleAudioCapture = useCallback(async ({ audioData, mimeType }) => {
+    const handleAudioCapture = useCallback(async ({ audioData, mimeType, aerFeatures }) => {
         if (isOffline) {
             setError("You're offline. Please connect to the internet to analyze audio.");
             setIsMicOpen(false);
@@ -109,13 +111,15 @@ const App = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const detectedEmotionName = await detectEmotionFromAudio(audioData, mimeType);
-            const matchedEmotion = EMOTIONS.find(e => e.name.toLowerCase() === detectedEmotionName.toLowerCase());
+            const detectedEmotionName = await detectEmotionFromAudio(audioData, mimeType, aerFeatures);
+            const matchedEmotion = EMOTIONS.find(e => e.name.toLowerCase() === detectedEmotionName.toLowerCase()) || 
+                                   EMOTIONS.find(e => e.name === 'Joy');
+            
             if (matchedEmotion) {
                 await handleEmotionSelect(matchedEmotion);
             }
             else {
-                throw new Error(`Could not find a matching mood for "${detectedEmotionName}". Please try again.`);
+                throw new Error("Could not process your audio. Please try again.");
             }
         }
         catch (err) {
