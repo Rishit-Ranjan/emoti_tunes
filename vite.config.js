@@ -14,7 +14,6 @@ export default defineConfig(({ mode }) => {
             'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
             'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
             // Add Foundry endpoint for client-side use
-            'import.meta.env.VITE_FOUNDRY_ENDPOINT': JSON.stringify(env.VITE_FOUNDRY_ENDPOINT || '/api/foundry')
         },
         resolve: {
             alias: {

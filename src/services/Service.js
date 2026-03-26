@@ -1,12 +1,10 @@
-// service.js - Updated with better debugging and format detection
-
 const API_BASE_URL = import.meta.env.VITE_FOUNDRY_ENDPOINT || '/api/foundry';
-const FOUNDRY_MODEL = 'phi-3.5-mini-instruct-generic-cpu:1';
+const FOUNDRY_MODEL = 'Phi-3.5-mini-instruct-generic-cpu:1';
 
 const PHI_CONFIG = {
     temperature: 0.7,
     maxTokens: 600,
-    retryAttempts: 1, // Reduced for debugging
+    retryAttempts: 2, 
     retryDelay: 1000,
     timeout: 30000,
     enableCaching: true
@@ -48,9 +46,12 @@ class ResponseCache {
 const playlistCache = new ResponseCache();
 const emotionCache = new ResponseCache();
 
-// Check online status
+// Check online status (Note: offline status might not block LOCAL Foundry, but we keep it for consistency)
 const checkOnlineStatus = async () => {
-    if (!navigator.onLine) {
+    // If it's a local address, we don't strictly need "online" (internet), 
+    // but the app uses it to show errors. We'll allow local calls even if offline.
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!navigator.onLine && !isLocal) {
         throw new Error("You are currently offline. An internet connection is required.");
     }
 };
@@ -81,10 +82,11 @@ const tryRequestFormats = async (prompt, options = {}) => {
                 max_tokens: options.max_tokens || PHI_CONFIG.maxTokens
             }
         },
-        // Format 3: Simple prompt
+        // Format 3: Simple prompt (Legacy Completion)
         {
             name: "Simple Prompt",
             body: {
+                model: FOUNDRY_MODEL,
                 prompt: prompt,
                 max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
                 temperature: options.temperature || PHI_CONFIG.temperature
@@ -98,48 +100,20 @@ const tryRequestFormats = async (prompt, options = {}) => {
                 max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
                 temperature: options.temperature || PHI_CONFIG.temperature
             }
-        },
-        // Format 5: Text field
-        {
-            name: "Text Field",
-            body: {
-                text: prompt,
-                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
-                temperature: options.temperature || PHI_CONFIG.temperature
-            }
-        },
-        // Format 6: No model field
-        {
-            name: "No Model Field",
-            body: {
-                messages: [{ role: "user", content: prompt }],
-                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
-                temperature: options.temperature || PHI_CONFIG.temperature
-            }
-        },
-        // Format 7: Completions format
-        {
-            name: "Completions Format",
-            body: {
-                model: FOUNDRY_MODEL,
-                prompt: prompt,
-                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
-                temperature: options.temperature || PHI_CONFIG.temperature
-            }
         }
     ];
 
     for (const format of formats) {
         try {
             console.log(`📝 Trying format: ${format.name}`);
-            // Completions format usually requires a different endpoint than Chat
-            const endpoint = format.name === "Completions Format" ? `${API_BASE_URL}/v1/completions` : `${API_BASE_URL}/v1/chat/completions`;
+            const isChatFormat = Array.isArray(format.body.messages);
+            const endpoint = isChatFormat ? `${API_BASE_URL}/v1/chat/completions` : `${API_BASE_URL}/v1/completions`;
             
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer local-foundry-token' // Some servers require this header
+                    'Authorization': 'Bearer local-foundry-token'
                 },
                 body: JSON.stringify(format.body)
             });
@@ -149,14 +123,15 @@ const tryRequestFormats = async (prompt, options = {}) => {
             if (response.ok) {
                 console.log(`✅ Format "${format.name}" succeeded!`);
                 try {
+                    // Try parsing as-is
                     const data = JSON.parse(responseText);
                     return { success: true, data, format: format.name };
-                } catch (e) {
+                } catch {
+                    // If parsing fails, pass the raw text to be cleaned later
                     return { success: true, text: responseText, format: format.name };
                 }
             } else {
                 console.log(`❌ Format "${format.name}" failed with status ${response.status}`);
-                console.log(`   Response: ${responseText.substring(0, 100)}`);
             }
         } catch (error) {
             console.log(`❌ Format "${format.name}" error:`, error.message);
@@ -187,10 +162,6 @@ export const callFoundryPhi = async (prompt, options = {}) => {
             text = result.data.response;
         } else if (result.data.text) {
             text = result.data.text;
-        } else if (result.data.generated_text) {
-            text = result.data.generated_text;
-        } else if (result.data.output) {
-            text = result.data.output;
         } else {
             text = JSON.stringify(result.data);
         }
@@ -212,17 +183,20 @@ const cleanJsonString = (responseText) => {
     let jsonText = responseText.trim();
     
     // Remove markdown code blocks
-    const jsonMatch = jsonText.match(/```json\n([\s\S]*?)\n```/);
+    const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (jsonMatch) {
         jsonText = jsonMatch[1].trim();
     }
     
-    // Remove any trailing commas before closing braces/brackets
+    // Aggressive cleaning for common LLM errors (like unescaped quotes in middle of values)
+    // 1. Fix cases like "title": "Song" (Annotation) -> "title": "Song (Annotation)"
+    jsonText = jsonText.replace(/"([^"]+)":\s*"([^"]+)"\s*\(([^)]+)\)/g, '"$1": "$2 ($3)"');
+    
+    // 2. Fix trailing commas
     jsonText = jsonText.replace(/,\s*}/g, '}').replace(/,\s*\]/g, ']');
     
-    // Note: Aggressive regex replacement removed as it can corrupt 
-    // valid song data (like apostrophes or colons inside titles).
-    // Relying on model output and markdown stripping.
+    // 3. Fix potential typos in keys like "titlelaus" -> "title"
+    jsonText = jsonText.replace(/"title[a-z]*":/gi, '"title":');
     
     return jsonText;
 };
@@ -240,7 +214,7 @@ const withRetry = async (fn, context, retries = PHI_CONFIG.retryAttempts) => {
     }
 };
 
-// Fallback playlists (same as before)
+// Fallback playlists
 const FALLBACK_PLAYLISTS = {
     'Joy': [
         { title: "Happy", artist: "Pharrell Williams" },
@@ -286,7 +260,7 @@ const FALLBACK_PLAYLISTS = {
         { title: "Levels", artist: "Avicii" },
         { title: "Can't Hold Us", artist: "Macklemore & Ryan Lewis" },
         { title: "Thunderstruck", artist: "AC/DC" },
-        { title: "Seven Nation Army", artist: "Macklemore" },
+        { title: "Seven Nation Army", artist: "The White Stripes" },
         { title: "Wake Me Up", artist: "Avicii" },
         { title: "Party Rock Anthem", artist: "LMFAO" }
     ],
@@ -296,7 +270,7 @@ const FALLBACK_PLAYLISTS = {
         { title: "Exile", artist: "Taylor Swift ft. Bon Iver" },
         { title: "Holocene", artist: "Bon Iver" },
         { title: "Summertime Sadness", artist: "Lana Del Rey" },
-        { title: "Liability", artist: "Taylor Swift" },
+        { title: "Liability", artist: "Lorde" },
         { title: "Writer in the Dark", artist: "Lorde" },
         { title: "Slow Dancing in a Burning Room", artist: "John Mayer" },
         { title: "Landslide", artist: "Fleetwood Mac" },
@@ -332,16 +306,13 @@ const FALLBACK_PLAYLISTS = {
 export const generatePlaylist = async (emotion) => {
     await checkOnlineStatus();
     
-    const cacheKey = `playlist_${emotion}`;
-    const cachedPlaylist = PHI_CONFIG.enableCaching ? playlistCache.get(cacheKey) : null;
-    if (cachedPlaylist) {
-        console.log(`📦 Returning cached playlist for emotion: ${emotion}`);
-        return cachedPlaylist;
-    }
+    // We remove the cache check here to ensure fresh results every click as requested
+    // const cachedPlaylist = ... 
     
     try {
-        const prompt = `Generate a playlist of 10 songs that capture the feeling of '${emotion}'. 
-        
+        const prompt = `Generate a fresh, unique, and diverse playlist of 10 songs that perfectly capture the feeling of '${emotion}'. 
+        IMPORTANT: Try to include different artists and styles than typical entries.
+
 Return ONLY a valid JSON object with this exact structure:
 {
     "songs": [
@@ -350,7 +321,7 @@ Return ONLY a valid JSON object with this exact structure:
     ]
 }
 
-The playlist should have diverse genres and artists suitable for this mood. Do not include any text outside the JSON.`;
+Ensure the output contains only the JSON. Do not include any conversational text or explanation.`;
         
         const response = await withRetry(
             () => callFoundryPhi(prompt, {
@@ -371,15 +342,8 @@ The playlist should have diverse genres and artists suitable for this mood. Do n
         }
         
         if (parsed && Array.isArray(parsed.songs)) {
-            const playlist = parsed.songs;
-            if (PHI_CONFIG.enableCaching) {
-                playlistCache.set(cacheKey, playlist);
-            }
-            return playlist;
+            return parsed.songs;
         } else if (Array.isArray(parsed)) {
-            if (PHI_CONFIG.enableCaching) {
-                playlistCache.set(cacheKey, parsed);
-            }
             return parsed;
         } else {
             throw new Error("The AI returned a playlist, but its structure was not what we expected.");
@@ -399,14 +363,14 @@ The playlist should have diverse genres and artists suitable for this mood. Do n
     }
 };
 
-// Emotion detection (using fallback)
+// Emotion detection (using fallback since Phi-3.5 is text-only)
 export const detectEmotionFromImage = async (base64ImageData) => {
-    console.log("📸 Emotion detection from image - using fallback");
+    console.log("📸 Image analysis skipped - Phi-3.5 is text-only model");
     return 'Joy';
 };
 
 export const detectEmotionFromAudio = async (base64AudioData, mimeType) => {
-    console.log("🎤 Emotion detection from audio - using fallback");
+    console.log("🎤 Audio analysis skipped - Phi-3.5 is text-only model");
     return 'Joy';
 };
 
