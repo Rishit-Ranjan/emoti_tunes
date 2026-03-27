@@ -7,6 +7,7 @@ import Loader from './components/Loader';
 import CameraView from './components/CameraView';
 import AudioView from './components/AudioView';
 import ProfileView from './components/ProfileView';
+import LibraryView from './components/LibraryView';
 
 const OfflineBanner = () => (<div className="fixed top-0 left-0 right-0 bg-slate-800 border-b border-yellow-500/30 text-center p-2 text-sm text-yellow-300 z-50 flex items-center justify-center shadow-lg" role="status">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -28,6 +29,10 @@ const App = () => {
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchActive, setIsSearchActive] = useState(false);
+    
+    // Create Playlist Modal State
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [newPlaylistName, setNewPlaylistName] = useState('');
 
     useEffect(() => {
         const handleOnline = () => {
@@ -92,7 +97,7 @@ const App = () => {
         finally {
             setIsLoading(false);
         }
-    }, [isOffline, history, historyIndex, view]);
+    }, [isOffline]);
 
     const handleReset = useCallback(() => {
         setCurrentEmotion(null);
@@ -100,24 +105,30 @@ const App = () => {
         setError(null);
         setIsLoading(false);
         navigateTo('home');
-    }, [history, historyIndex, view]);
+    }, []);
 
-    const handleCreatePlaylist = () => {
-        if (playlist.length === 0) {
-            alert("Generate a playlist first!");
-            return;
-        }
-        const name = prompt("Enter playlist name:", `${currentEmotion?.name || 'My'} Vibe`);
-        if (name) {
-            const newPlaylist = {
-                id: Date.now(),
-                name,
-                songs: [...playlist],
-                emotion: currentEmotion
-            };
-            setUserPlaylists(prev => [newPlaylist, ...prev]);
-            alert("Playlist created and added to Library!");
-        }
+    const openSaveModal = () => {
+        if (playlist.length === 0) return;
+        setNewPlaylistName(`${currentEmotion?.name || 'My'} Vibe Collection`);
+        setIsCreateModalOpen(true);
+    };
+
+    const handleSavePlaylist = () => {
+        const pl = {
+            id: Date.now(),
+            name: newPlaylistName || `${currentEmotion?.name || 'My'} Vibe`,
+            songs: [...playlist],
+            emotion: {...currentEmotion}
+        };
+        setUserPlaylists(prev => [pl, ...prev]);
+        setIsCreateModalOpen(false);
+        navigateTo('library');
+    };
+
+    const handleSelectSavedPlaylist = (pl) => {
+        setPlaylist(pl.songs);
+        setCurrentEmotion(pl.emotion);
+        navigateTo('playlist');
     };
 
     const handleCapture = useCallback(async (imageData) => {
@@ -139,7 +150,7 @@ const App = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const detectedName = await detectEmotionFromAudio(data.audioData, data.mimeType, data.aerFeatures);
+            const detectedName = await detectEmotionFromAudio(data);
             const matched = EMOTIONS.find(e => e.name.toLowerCase() === detectedName.toLowerCase()) || EMOTIONS[0];
             await handleEmotionSelect(matched);
         } catch (err) {
@@ -148,149 +159,154 @@ const App = () => {
         }
     }, [handleEmotionSelect]);
 
-    const handleCameraError = useCallback((errorMessage) => {
-        setError(errorMessage);
-        goBack();
-    }, [goBack]);
-
-    const handleAudioError = useCallback((errorMessage) => {
-        setError(errorMessage);
-        goBack();
-    }, [goBack]);
-
     const renderContent = () => {
-        if (isLoading) return <div className="h-full w-full flex items-center justify-center"><Loader message={loadingMessage}/></div>;
+        if (isLoading) return <Loader message={loadingMessage} emotion={currentEmotion}/>;
         if (error) return (
-            <div className="h-full w-full flex items-center justify-center p-8">
-                <div className="text-center bg-[#1a1a2e] border border-violet-500/30 rounded-3xl p-12 max-w-lg shadow-[0_0_50px_rgba(139,92,246,0.15)] animate-in zoom-in-95 duration-300">
-                    <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
-                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    </div>
-                    <h2 className="text-3xl font-black text-white mb-4 tracking-tighter uppercase">Oops!</h2>
-                    <p className="text-violet-200/60 mb-8 font-medium leading-relaxed">{error}</p>
-                    <button onClick={handleReset} className="w-full bg-violet-600 hover:bg-violet-500 text-white font-black py-4 rounded-2xl shadow-xl transition-all hover:scale-[1.02] active:scale-95 uppercase tracking-widest text-sm">
-                        Go Home
-                    </button>
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#0a0a12] text-center animate-in fade-in duration-500">
+                <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-8 border border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.2)] animate-pulse">
+                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                 </div>
+                <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-4 leading-none">Vibe Interrupted</h2>
+                <p className="text-red-400 text-sm font-black uppercase tracking-widest max-w-md opacity-60 mb-10">{error}</p>
+                <button onClick={handleReset} className="px-10 py-5 bg-white text-black rounded-2xl font-black uppercase text-xs tracking-[0.3em] hover:scale-105 transition-all shadow-2xl active:scale-95">Reset Vibe Check</button>
             </div>
         );
 
         switch (view) {
-            case 'profile': return <ProfileView onBack={goBack} />;
-            case 'camera': return <div className="h-full w-full flex items-center justify-center"><CameraView onCapture={handleCapture} onClose={goBack} onError={handleCameraError}/></div>;
-            case 'mic': return <div className="h-full w-full flex items-center justify-center"><AudioView onCapture={handleAudioCapture} onClose={goBack} onError={handleAudioError}/></div>;
+            case 'profile': return <ProfileView currentVibe={currentEmotion?.name || 'Joy'} onBack={goBack} />;
+            case 'camera': return <CameraView onCapture={handleCapture} onClose={goBack} onError={setError}/>;
+            case 'mic': return <AudioView onCapture={handleAudioCapture} onClose={goBack} onError={setError}/>;
             case 'playlist': return <PlaylistDisplay playlist={playlist} emotion={currentEmotion} onReset={handleReset}/>;
-            case 'library': return (
-                <div className="flex-1 p-8">
-                    <h2 className="text-5xl font-black mb-12 uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-cyan-400">Library</h2>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-                        <div onClick={() => navigateTo('home')} className="bg-[#1a1a2e]/50 p-6 rounded-3xl border border-white/5 hover:border-violet-500/30 transition-all group cursor-pointer">
-                            <div className="aspect-square bg-gradient-to-br from-violet-600 to-indigo-700 rounded-2xl mb-6 shadow-2xl flex items-center justify-center transform group-hover:rotate-3 transition-transform">
-                                <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                            </div>
-                            <h3 className="text-xl font-black text-white uppercase tracking-tight">Liked Songs</h3>
-                            <p className="text-violet-300/50 text-sm font-bold mt-1">Playlist • 0 songs</p>
-                        </div>
-                        {userPlaylists.map(pl => (
-                            <div key={pl.id} className="bg-[#1a1a2e]/50 p-6 rounded-3xl border border-white/5 hover:border-violet-500/30 transition-all group cursor-pointer">
-                                <div className={`aspect-square bg-gradient-to-br ${pl.emotion.gradient} rounded-2xl mb-6 shadow-2xl flex items-center justify-center transform group-hover:rotate-3 transition-transform`}>
-                                    <img src={`https://picsum.photos/seed/${pl.id}/300/300`} className="w-full h-full object-cover rounded-2xl opacity-60" alt="" />
-                                </div>
-                                <h3 className="text-xl font-black text-white uppercase tracking-tight truncate">{pl.name}</h3>
-                                <p className="text-violet-300/50 text-sm font-bold mt-1">{pl.songs.length} tracks</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
+            case 'library': return <LibraryView playlists={userPlaylists} onSelectPlaylist={handleSelectSavedPlaylist} />;
             default: return <EmotionSelector emotions={EMOTIONS} onSelect={handleEmotionSelect} onOpenCamera={() => navigateTo('camera')} onOpenMic={() => navigateTo('mic')} isOffline={isOffline}/>;
         }
     };
 
     return (
-    <div className="h-screen w-screen bg-[#0a0a12] text-violet-100 flex flex-col font-sans overflow-hidden p-3 gap-3">
-        {isOffline && <OfflineBanner />}
-        
-        <div className="flex-1 flex gap-3 min-h-0 w-full relative">
+        <div className="flex h-screen bg-black text-white overflow-hidden font-sans">
+            {isOffline && <OfflineBanner />}
+
             {/* Sidebar */}
-            <nav className="w-80 bg-[#12121e] rounded-3xl hidden md:flex flex-col shadow-2xl border border-white/5">
-                <div className="p-8 space-y-10">
-                    <div onClick={handleReset} className="flex items-center space-x-3 cursor-pointer group">
-                        <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-cyan-400 rounded-xl shadow-lg flex items-center justify-center group-hover:rotate-12 transition-transform">
-                            <img src="/logo.png" alt="" className="w-7 h-7 rounded-full" />
-                        </div>
-                        <span className="font-black text-2xl tracking-tighter uppercase text-white">EmotiTunes</span>
+            <div className="w-72 bg-[#050508] border-r border-white/5 flex flex-col pt-10 px-6 z-40">
+                <div className="flex items-center space-x-4 mb-14 px-2 hover:scale-105 transition-transform cursor-pointer group" onClick={() => navigateTo('home')}>
+                    <div className="w-12 h-12 bg-gradient-to-br from-violet-600 to-cyan-400 rounded-2xl flex items-center justify-center shadow-[0_10px_30px_rgba(139,92,246,0.3)] group-hover:rotate-12 transition-all">
+                        <img src="/logo.png" className="w-7 h-7" alt="" />
                     </div>
-
-                    <div className="space-y-6">
-                        <div onClick={handleReset} className={`flex items-center space-x-5 cursor-pointer font-black uppercase tracking-widest text-sm transition-all ${view === 'home' ? 'text-cyan-400' : 'text-violet-200/40 hover:text-white'}`}>
-                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12.5 3.247a1 1 0 00-1 0L4 7.577V20h4.5v-6a1 1 0 011-1h5a1 1 0 011 1v6H20V7.577l-7.5-4.33zm-2-1.732a3 3 0 013 0l7.5 4.33a2 2 0 011 1.732V21a1 1 0 01-1 1h-6.5a1 1 0 01-1-1v-6h-3v6a1 1 0 01-1 1H3a1 1 0 01-1-1V7.577a2 2 0 011-1.732l7.5-4.33z"/></svg>
-                            <span>Home</span>
-                        </div>
-                        <div onClick={() => navigateTo('library')} className={`flex items-center space-x-5 cursor-pointer font-black uppercase tracking-widest text-sm transition-all ${view === 'library' ? 'text-cyan-400' : 'text-violet-200/40 hover:text-white'}`}>
-                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M14.5 2.134v-2c5.968.225 10.775 5.032 11 11h-2c-.221-4.869-4.131-8.779-9-9zM3 10V8A10.007 10.007 0 0 1 12 2.05V4a8.006 8.006 0 0 0-7.85 7.85H2v-1.85zM2 13v1.85A10.007 10.007 0 0 0 12 21.95v-1.95A8.006 8.006 0 0 1 4.15 12.15H2V13zm12.5 8.866v2c5.968-.225 10.775-5.032 11-11h-2c-.221 4.869-4.131-8.779-9 9zM12 14v4a2 2 0 0 0 2 2h3v-2h-3v-4h2.5L12 9 7.5 14H10z"/></svg>
-                            <span>Library</span>
-                        </div>
-                    </div>
+                    <h1 className="text-2xl font-black tracking-tighter uppercase leading-none">Emoti<br/><span className="text-cyan-400">Tunes</span></h1>
                 </div>
 
-                <div className="mx-8 border-t border-white/5"></div>
+                <nav className="space-y-4 flex-1">
+                    <button onClick={() => navigateTo('home')} className={`w-full flex items-center space-x-5 px-5 py-4 rounded-2xl transition-all group ${view === 'home' ? 'bg-white/5 text-cyan-400' : 'text-violet-200/40 hover:text-white hover:bg-white/5'}`}>
+                        <div className={`w-6 h-6 ${view === 'home' ? 'text-cyan-400' : 'text-current transition-colors'} group-hover:scale-110`}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></div>
+                        <span className="font-black uppercase text-xs tracking-[0.2em]">Home</span>
+                    </button>
+                    <button onClick={() => navigateTo('library')} className={`w-full flex items-center space-x-5 px-5 py-4 rounded-2xl transition-all group ${view === 'library' ? 'bg-white/5 text-cyan-400' : 'text-violet-200/40 hover:text-white hover:bg-white/5'}`}>
+                        <div className={`w-6 h-6 ${view === 'library' ? 'text-cyan-400' : 'text-current transition-colors'} group-hover:scale-110`}><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></div>
+                        <span className="font-black uppercase text-xs tracking-[0.2em]">Library</span>
+                    </button>
+                    
+                    <div className="pt-8 border-t border-white/5 mt-8 opacity-40">
+                         <span className="px-5 text-[10px] font-black uppercase tracking-[0.3em] text-white">Quick Actions</span>
+                    </div>
 
-                <div className="p-8 flex-1">
-                    <div onClick={handleCreatePlaylist} className="flex items-center space-x-5 cursor-pointer group text-violet-200/40 hover:text-white transition-all font-black uppercase tracking-widest text-sm">
-                        <div className="w-8 h-8 bg-violet-500/10 rounded-lg flex items-center justify-center group-hover:bg-violet-600 transition-all text-violet-400 group-hover:text-white">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M12 4v16m8-8H4"/></svg>
-                        </div>
-                        <span>Create Playlist</span>
+                    <button onClick={openSaveModal} className="w-full flex items-center space-x-5 px-5 py-4 rounded-2xl text-violet-200/40 hover:text-white hover:bg-white/5 transition-all group">
+                        <div className="w-6 h-6 bg-violet-600/10 rounded-lg flex items-center justify-center text-violet-500 group-hover:bg-violet-600 group-hover:text-white transition-all"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path d="M12 4v16m8-8H4"/></svg></div>
+                        <span className="font-black uppercase text-xs tracking-[0.2em]">Create Playlist</span>
+                    </button>
+                </nav>
+
+                <div className="pb-10 pt-4 space-y-3">
+                    <div className="bg-gradient-to-br from-violet-900/50 to-indigo-950 p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/10 rounded-full blur-2xl -mr-12 -mt-12 transition-all group-hover:bg-cyan-400/20"></div>
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-2">Pro Feature</h4>
+                        <p className="text-[11px] font-bold text-violet-200/60 uppercase leading-relaxed tracking-wider mb-4">Lossless Streaming & Advanced Mood AI</p>
+                        <button className="w-full py-2 bg-white text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-transform">Get Ultra</button>
                     </div>
                 </div>
-            </nav>
+            </div>
 
-            <main className="flex-1 bg-[#0f0f1a] rounded-3xl relative overflow-hidden flex flex-col shadow-2xl border border-white/5">
-                {/* Enhanced Top Nav */}
-                <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between px-8 z-30 pointer-events-none">
-                     <div className="flex items-center space-x-4 pointer-events-auto">
-                         <div className="flex space-x-2">
-                             <button onClick={goBack} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white backdrop-blur-xl transition-all border border-white/10 active:scale-90" title="Back">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"/></svg>
-                             </button>
-                             <button onClick={goForward} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white backdrop-blur-xl transition-all border border-white/10 active:scale-90" title="Forward">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"/></svg>
-                             </button>
-                         </div>
-                     </div>
+            {/* Main Area */}
+            <div className="flex-1 flex flex-col relative overflow-hidden shadow-[inset_0_0_100px_rgba(0,0,0,0.5)]">
+                {/* Header (Center Search) */}
+                <header className="h-24 px-10 flex items-center justify-between absolute top-0 left-0 right-0 z-50 pointer-events-none">
+                    <div className="flex items-center space-x-4 pointer-events-auto">
+                        <button onClick={goBack} disabled={historyIndex === 0} className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white/40 hover:text-white transition-all border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <button onClick={goForward} disabled={historyIndex === history.length - 1} className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white/40 hover:text-white transition-all border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
 
-                     {/* Centered Large Search Bar */}
-                     <div className="flex-1 flex justify-center px-4 pointer-events-auto">
-                        <div className={`relative flex items-center transition-all duration-500 ${isSearchActive ? 'w-full max-w-xl' : 'w-12 h-12'}`}>
+                    {/* Centered Large Search Bar */}
+                    <div className="flex justify-center flex-1 max-w-2xl px-8 pointer-events-auto">
+                        <div className={`relative flex items-center transition-all duration-700 ${isSearchActive ? 'w-full' : 'w-14'}`}>
                             <button 
                                 onClick={() => setIsSearchActive(!isSearchActive)}
-                                className={`absolute left-0 w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-lg z-10 ${isSearchActive ? 'bg-transparent text-violet-300' : 'bg-violet-600 text-white hover:scale-110 active:scale-90'}`}
+                                className={`h-14 flex items-center justify-center transition-all rounded-full border border-white/5 shadow-2xl ${isSearchActive ? 'w-14 bg-white/5 border-white/20' : 'w-14 bg-black/80 hover:bg-violet-600 hover:scale-110 active:scale-90 text-white'}`}
                             >
-                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10.533 1.27893C5.242 1.27893 1 5.49893 1 10.7489C1 15.9989 5.242 20.2189 10.533 20.2189C12.636 20.2189 14.57 19.5389 16.14 18.3989L21.293 23.5089C21.684 23.8989 22.316 23.8989 22.707 23.5089C23.098 23.1189 23.098 22.4889 22.707 22.0989L17.65 17.0789C19.117 15.4289 20.066 13.1989 20.066 10.7489C20.066 5.49893 15.824 1.27893 10.533 1.27893ZM10.533 3.27893C14.73 3.27893 18.066 6.57893 18.066 10.7489C18.066 14.9189 14.73 18.2189 10.533 18.2189C6.335 18.2189 3 14.9189 3 10.7489C3 6.57893 6.335 3.27893 10.533 3.27893Z"/></svg>
+                                <svg className={`w-6 h-6 ${isSearchActive ? 'text-cyan-400 rotate-90' : 'text-current'} transition-all`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                             </button>
                             <input 
-                                type="text" 
+                                type="text"
+                                placeholder={isSearchActive ? "Explore moods, songs, vibes..." : ""}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="What's your current vibe?" 
-                                className={`bg-white/5 border border-white/10 rounded-2xl py-3 pl-14 pr-6 text-white text-lg w-full focus:ring-2 focus:ring-violet-500/50 backdrop-blur-2xl transition-all duration-500 shadow-2xl ${isSearchActive ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`} 
-                                autoFocus={isSearchActive}
+                                className={`h-14 pl-14 pr-6 rounded-full bg-white/5 backdrop-blur-3xl text-white outline-none border border-white/10 transition-all duration-700 font-bold uppercase text-[10px] tracking-widest ${isSearchActive ? 'w-full opacity-100' : 'w-0 opacity-0 pointer-events-none'}`}
                             />
                         </div>
-                     </div>
-                     
-                     <div className="flex space-x-6 pointer-events-auto items-center">
-                         <button onClick={() => navigateTo('profile')} className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all p-0.5 hover:rotate-6 ${view === 'profile' ? 'border-cyan-400 bg-cyan-400/20' : 'border-white/10 bg-white/5'}`}>
-                             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Rishit%20Ranjan`} alt="" className="w-full h-full rounded-lg" />
-                         </button>
-                     </div>
-                </div>
+                    </div>
 
-                {renderContent()}
-            </main>
+                    <div className="flex items-center space-x-6 pointer-events-auto">
+                        <button className="flex items-center space-x-4 bg-black/60 backdrop-blur-xl py-2 px-5 rounded-full border border-white/10 group active:scale-95 transition-all" onClick={() => navigateTo('profile')}>
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-cyan-400 p-0.5">
+                                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Rishit%20Ranjan`} className="w-full h-full rounded-full bg-black" alt="" />
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/70 group-hover:text-white transition-colors">Rishit Ranjan</span>
+                        </button>
+                    </div>
+                </header>
+
+                <main className="flex-1 w-full bg-[#0a0a12] flex flex-col pt-0 relative z-10 transition-all duration-500 overflow-hidden">
+                    {renderContent()}
+                </main>
+            </div>
+
+            {/* Create Playlist Modal (Premium Overlay) */}
+            {isCreateModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 animate-in fade-in duration-300">
+                    <div className="absolute inset-0 bg-[#0a0a12]/95 backdrop-blur-3xl" onClick={() => setIsCreateModalOpen(false)}></div>
+                    <div className="relative w-full max-w-lg bg-[#12121e] rounded-[3rem] p-12 shadow-[0_50px_100px_rgba(0,0,0,0.8)] border border-white/5 flex flex-col items-center text-center space-y-10 animate-in zoom-in-95 duration-500">
+                        <div className="w-24 h-24 bg-violet-600/10 rounded-[2rem] flex items-center justify-center text-violet-500 shadow-2xl border border-violet-500/20">
+                            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none italic underline decoration-cyan-400 decoration-4 underline-offset-8">Capture Vibe</h2>
+                            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em]">Seal your emotional state into a vault</p>
+                        </div>
+
+                        <div className="w-full space-y-2">
+                             <p className="text-left text-[8px] font-black text-cyan-400 uppercase tracking-widest px-6">Collection Identity</p>
+                             <input 
+                                type="text"
+                                autoFocus
+                                value={newPlaylistName}
+                                onChange={(e) => setNewPlaylistName(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSavePlaylist()}
+                                className="w-full bg-white/5 border border-white/10 px-8 py-5 rounded-2xl outline-none text-white font-black text-lg uppercase tracking-tight focus:border-violet-600 transition-all placeholder:text-white/10"
+                                placeholder="Enter Collection Name..."
+                             />
+                        </div>
+
+                        <div className="flex flex-col w-full space-y-4">
+                            <button onClick={handleSavePlaylist} className="w-full py-5 bg-white text-black rounded-2xl font-black uppercase text-xs tracking-[0.3em] hover:scale-105 active:scale-95 transition-all shadow-2xl">Create Collection</button>
+                            <button onClick={() => setIsCreateModalOpen(false)} className="w-full py-4 text-white/20 font-black uppercase text-[10px] tracking-[0.2em] hover:text-white transition-colors">Discard</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-    </div>
     );
 };
 
