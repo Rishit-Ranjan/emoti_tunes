@@ -93,7 +93,7 @@ const AudioView = ({ onCapture, onClose, onError }) => {
             let recorder;
             try {
                 recorder = new MediaRecorder(stream, options);
-            } catch (e) {
+            } catch {
                 recorder = new MediaRecorder(stream);
             }
             mediaRecorderRef.current = recorder;
@@ -128,7 +128,7 @@ const AudioView = ({ onCapture, onClose, onError }) => {
             timerIntervalRef.current = window.setInterval(() => {
                 setRecordingTime(prev => prev + 1);
             }, 1000);
-        } catch (err) {
+        } catch {
             onError("Microphone access failed. Please ensure permissions are granted.");
         }
     };

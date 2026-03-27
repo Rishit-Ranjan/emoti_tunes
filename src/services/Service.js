@@ -1,13 +1,13 @@
 const API_BASE_URL = import.meta.env.VITE_FOUNDRY_ENDPOINT || '/api/foundry';
-const FOUNDRY_MODEL = 'Phi-3.5-mini-instruct-generic-cpu:1';
+const PLAYLIST_MODEL = 'phi3.5:latest';
+const VISION_MODEL = 'llava:latest';
 
 const PHI_CONFIG = {
     temperature: 0.7,
     maxTokens: 600,
     retryAttempts: 2, 
     retryDelay: 1000,
-    timeout: 30000,
-    enableCaching: true
+    timeout: 30000
 };
 
 // Response cache
@@ -43,7 +43,6 @@ class ResponseCache {
     }
 }
 
-const playlistCache = new ResponseCache();
 const emotionCache = new ResponseCache();
 
 // Check online status (Note: offline status might not block LOCAL Foundry, but we keep it for consistency)
@@ -58,12 +57,14 @@ const checkOnlineStatus = async () => {
 
 // Try multiple request formats
 const tryRequestFormats = async (prompt, options = {}) => {
+    const targetModel = options.model || PLAYLIST_MODEL;
+    
     const formats = [
         // Format 1: OpenAI chat format with system message
         {
             name: "OpenAI Chat with System",
             body: {
-                model: FOUNDRY_MODEL,
+                model: targetModel,
                 messages: [
                     { role: "system", content: "You are a music recommendation assistant. Respond with valid JSON only." },
                     { role: "user", content: prompt }
@@ -76,7 +77,7 @@ const tryRequestFormats = async (prompt, options = {}) => {
         {
             name: "OpenAI Chat without System",
             body: {
-                model: FOUNDRY_MODEL,
+                model: targetModel,
                 messages: [{ role: "user", content: prompt }],
                 temperature: options.temperature || PHI_CONFIG.temperature,
                 max_tokens: options.max_tokens || PHI_CONFIG.maxTokens
@@ -86,13 +87,13 @@ const tryRequestFormats = async (prompt, options = {}) => {
         {
             name: "Simple Prompt",
             body: {
-                model: FOUNDRY_MODEL,
+                model: targetModel,
                 prompt: prompt,
                 max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
                 temperature: options.temperature || PHI_CONFIG.temperature
             }
         },
-        // Format 4: Input field
+        // Format 4: Input field (Some older local tools)
         {
             name: "Input Field",
             body: {
@@ -101,41 +102,100 @@ const tryRequestFormats = async (prompt, options = {}) => {
                 temperature: options.temperature || PHI_CONFIG.temperature
             }
         },
-        // Format 5: Vision Chat Format (for multimodal/image analysis)
+        // Format 5: Ollama Native Chat
         {
-            name: "Vision Chat Format",
+            name: "Ollama Native Chat",
+            path: "/api/chat",
             body: {
-                model: FOUNDRY_MODEL,
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            { type: "text", text: options.promptText || prompt },
-                            ...(options.imageData ? [{ type: "image_url", image_url: { url: `data:image/jpeg;base64,${options.imageData}` } }] : [])
-                        ]
-                    }
-                ],
-                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
-                temperature: options.temperature || PHI_CONFIG.temperature
+                model: targetModel,
+                messages: [{ role: "user", content: prompt }],
+                stream: false,
+                options: {
+                    temperature: options.temperature || PHI_CONFIG.temperature,
+                    num_predict: options.max_tokens || PHI_CONFIG.maxTokens
+                }
+            }
+        },
+        // Format 6: Ollama Native Generate
+        {
+            name: "Ollama Native Generate",
+            path: "/api/generate",
+            body: {
+                model: targetModel,
+                prompt: prompt,
+                stream: false,
+                options: {
+                    temperature: options.temperature || PHI_CONFIG.temperature,
+                    num_predict: options.max_tokens || PHI_CONFIG.maxTokens
+                }
             }
         }
     ];
 
+    // Only add Vision formats if we have an image to analyze
+    if (options.imageData) {
+        // Splice vision formats to the START of the list
+        formats.unshift(
+            // Format: Ollama Native Vision
+            {
+                name: "Ollama Native Vision",
+                path: "/api/chat",
+                body: {
+                    model: VISION_MODEL,
+                    messages: [{
+                        role: "user",
+                        content: options.promptText || prompt,
+                        images: [options.imageData]
+                    }],
+                    stream: false
+                }
+            },
+            // Format: OpenAI Vision
+            {
+                name: "Vision Chat Format",
+                body: {
+                    model: VISION_MODEL,
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: options.promptText || prompt },
+                                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${options.imageData}` } }
+                            ]
+                        }
+                    ],
+                    max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
+                    temperature: options.temperature || PHI_CONFIG.temperature
+                }
+            }
+        );
+    }
+
     for (const format of formats) {
         try {
             console.log(`📝 Trying format: ${format.name}`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), options.timeout || PHI_CONFIG.timeout);
+
             const isChatFormat = Array.isArray(format.body.messages);
-            const endpoint = isChatFormat ? `${API_BASE_URL}/v1/chat/completions` : `${API_BASE_URL}/v1/completions`;
+            let endpoint;
+            
+            if (format.path) {
+                endpoint = `${API_BASE_URL}${format.path}`;
+            } else {
+                endpoint = isChatFormat ? `${API_BASE_URL}/v1/chat/completions` : `${API_BASE_URL}/v1/completions`;
+            }
             
             const response = await fetch(endpoint, {
+                signal: controller.signal,
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer local-foundry-token'
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(format.body)
             });
             
+            clearTimeout(timeoutId);
             const responseText = await response.text();
             
             if (response.ok) {
@@ -149,9 +209,10 @@ const tryRequestFormats = async (prompt, options = {}) => {
                     return { success: true, text: responseText, format: format.name };
                 }
             } else {
-                console.log(`❌ Format "${format.name}" failed with status ${response.status}`);
+                console.log(`❌ Format "${format.name}" failed with status ${response.status}: ${responseText.substring(0, 250)}`);
             }
         } catch (error) {
+            if (error.name === 'AbortError') console.log(`❌ Format "${format.name}" timed out`);
             console.log(`❌ Format "${format.name}" error:`, error.message);
         }
     }
@@ -355,7 +416,7 @@ Ensure the output contains only the JSON. Do not include any conversational text
         try {
             parsed = JSON.parse(jsonText);
         } catch (parseError) {
-            console.error("Failed to parse playlist JSON:", jsonText);
+            console.error("Failed to parse playlist JSON:", jsonText, parseError);
             throw new Error("The AI returned a response in an unexpected format.");
         }
         
@@ -393,15 +454,16 @@ export const detectEmotionFromImage = async (base64ImageData) => {
     try {
         const promptText = "Identify the primary facial emotion of the person in this image. Respond ONLY with one of these words: Joy, Sadness, Anger, Excitement, Melancholy, Peaceful, Joy-Anger, Joy-Surprise, Joy-Excitement, Sad-Anger.";
         
-        // Pass imageData through options so tryRequestFormats can use Vision format if supported
+        // Pass model override for vision task
         const response = await callFoundryPhi(promptText, { 
             imageData: base64ImageData,
+            model: VISION_MODEL,
             max_tokens: 15,
             temperature: 0.1 // Lower for objective recognition tasks
         });
         
         let text = response.text.trim().toLowerCase().replace(/[^a-z-]/g, '');
-        const moods = ['joy', 'sadness', 'anger', 'excitement', 'melancholy', 'peaceful', 'joy-anger', 'joy-surprise', 'joy-excitement', 'sad-anger'];
+        const moods = ['joy-anger', 'joy-surprise', 'joy-excitement', 'sad-anger', 'joy', 'sadness', 'anger', 'excitement', 'melancholy', 'peaceful'];
         
         const matchedMood = moods.find(m => text.includes(m));
         if (matchedMood) {
@@ -437,7 +499,7 @@ Based on these MIR (Music Information Retrieval) patterns, identify the user's e
         text = text.replace(/[^a-z-]/g, '');
 
         // Map AI result to our strict categories
-        const moods = ['joy', 'sadness', 'anger', 'excitement', 'melancholy', 'peaceful', 'joy-anger', 'joy-surprise', 'joy-excitement', 'sad-anger'];
+        const moods = ['joy-anger', 'joy-surprise', 'joy-excitement', 'sad-anger', 'joy', 'sadness', 'anger', 'excitement', 'melancholy', 'peaceful'];
         
         // Handle direct matches
         const matchedMood = moods.find(m => text.includes(m));
