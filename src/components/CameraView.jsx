@@ -1,153 +1,131 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+
 const CameraView = ({ onCapture, onClose, onError }) => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const [stream, setStream] = useState(null);
-    const [zoom, setZoom] = useState(1);
-    const [cameras, setCameras] = useState([]);
-    const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
-    const [cameraCapabilities, setCameraCapabilities] = useState(null);
-    const stopStream = useCallback(() => {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-    }, [stream]);
-    useEffect(() => {
-        let isMounted = true;
-        const initializeCamera = async () => {
-            stopStream();
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                if (!isMounted)
-                    return;
-                setCameras(videoDevices);
-                if (videoDevices.length === 0) {
-                    onError("No camera found on this device.");
-                    return;
-                }
-                const deviceId = videoDevices[currentCameraIndex]?.deviceId;
-                const constraints = {
-                    video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'user' },
-                    audio: false
-                };
-                const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-                if (isMounted && videoRef.current) {
-                    videoRef.current.srcObject = mediaStream;
-                    setStream(mediaStream);
-                    const videoTrack = mediaStream.getVideoTracks()[0];
-                    const capabilities = videoTrack.getCapabilities();
-                    setCameraCapabilities(capabilities);
-                    if (capabilities.zoom) {
-                        setZoom(capabilities.zoom.min);
-                    }
-                }
-            }
-            catch (err) {
-                if (!isMounted)
-                    return;
-                console.error("Error accessing camera:", err);
-                let errorMessage = "Could not access the camera. Please ensure you have granted permission.";
-                if (err instanceof Error && err.name === 'NotAllowedError') {
-                    errorMessage = "Camera permission was denied. Please grant permission in your browser settings to use this feature.";
-                }
-                onError(errorMessage);
-            }
-        };
-        initializeCamera();
-        return () => {
-            isMounted = false;
-            stopStream();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentCameraIndex, onError]);
-    useEffect(() => {
-        if (stream && cameraCapabilities?.zoom) {
-            const videoTrack = stream.getVideoTracks()[0];
-            if (typeof videoTrack.applyConstraints === 'function') {
-                videoTrack.applyConstraints({ advanced: [{ zoom }] }).catch(e => console.error("Failed to apply zoom", e));
-            }
-        }
-    }, [zoom, stream, cameraCapabilities]);
-    const handleSwitchCamera = useCallback(() => {
-        if (cameras.length > 1) {
-            setCurrentCameraIndex(prevIndex => (prevIndex + 1) % cameras.length);
-        }
-    }, [cameras.length]);
-    const handleCapture = useCallback(() => {
-        if (videoRef.current && canvasRef.current) {
-            const video = videoRef.current;
-            const canvas = canvasRef.current;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const context = canvas.getContext('2d');
-            if (context) {
-                // If using the front camera, the preview is mirrored via CSS.
-                // We need to flip the canvas context to capture the un-mirrored image.
-                if (cameras[currentCameraIndex]?.facing === 'user') {
-                    context.translate(canvas.width, 0);
-                    context.scale(-1, 1);
-                }
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
-                onCapture(imageData);
-            }
-            else {
-                onError("Could not process the image.");
-            }
-        }
-    }, [onCapture, onError, cameras, currentCameraIndex]);
-    const hasZoom = cameraCapabilities?.zoom && cameraCapabilities.zoom.max > cameraCapabilities.zoom.min;
-    const canSwitchCamera = cameras.length > 1;
-    return (
-        <div className="w-full max-w-2xl mx-auto flex flex-col items-center p-8 rounded-3xl bg-[#181818] shadow-2xl border border-white/5 animate-in slide-in-from-bottom-8 duration-500">
-            <h2 className="text-3xl font-black text-white mb-6 uppercase tracking-tighter">Capture Emotion</h2>
-            
-            <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-4 border-white/5 bg-black mb-8 group">
-                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" style={{ transform: cameras[currentCameraIndex]?.facing === 'user' ? 'scaleX(-1)' : 'scaleX(1)' }}/>
-                <canvas ref={canvasRef} className="hidden"/>
+    const [isCapturing, setIsCapturing] = useState(false);
+    const [countdown, setCountdown] = useState(null);
 
-                 {(hasZoom || canSwitchCamera) && (
-                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-                        {hasZoom && (
-                            <div className="flex items-center gap-3 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full text-white w-full max-w-[180px]">
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/></svg>
-                                <input type="range" min={cameraCapabilities.zoom.min} max={cameraCapabilities.zoom.max} step={cameraCapabilities.zoom.step || 1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-white"/>
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3h-6"/></svg>
+    const startCamera = useCallback(async () => {
+        try {
+            const s = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } 
+            });
+            setStream(s);
+            if (videoRef.current) {
+                videoRef.current.srcObject = s;
+            }
+        } catch (err) {
+            console.error("Camera access error:", err);
+            onError("Could not access camera. Please check permissions.");
+        }
+    }, [onError]);
+
+    useEffect(() => {
+        startCamera();
+        return () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, []);
+
+    const capturePhoto = () => {
+        if (isCapturing) return;
+        setIsCapturing(true);
+        setCountdown(3);
+
+        const timer = setInterval(() => {
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    executeCapture();
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
+    const executeCapture = () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const context = canvas.getContext('2d');
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        onCapture(imageData);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 animate-in fade-in zoom-in-95 duration-500 overflow-hidden">
+            <div className="absolute inset-0 bg-[#0a0a12]/95 backdrop-blur-3xl" onClick={onClose}></div>
+            
+            <div className="relative w-full max-w-4xl aspect-video bg-[#12121e] rounded-[2.5rem] overflow-hidden shadow-[0_0_100px_rgba(139,92,246,0.3)] border border-violet-500/20 flex flex-col group">
+                {/* Video Feed */}
+                <div className="relative flex-1 bg-black">
+                    <video 
+                        ref={videoRef} 
+                        autoPlay 
+                        playsInline 
+                        muted 
+                        className={`w-full h-full object-cover transition-all duration-700 ${isCapturing && !countdown ? 'brightness-150 scale-105' : ''}`}
+                    />
+                    
+                    {/* UI Overlays */}
+                    <div className="absolute inset-0 flex flex-col justify-between p-8 pointer-events-none">
+                        <div className="flex justify-between items-start">
+                            <div className="bg-black/40 backdrop-blur-xl px-4 py-2 rounded-xl border border-white/10 flex items-center space-x-3">
+                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Live Emotion Feed</span>
+                            </div>
+                            <button 
+                                onClick={onClose}
+                                className="w-12 h-12 rounded-2xl bg-black/40 hover:bg-red-500/20 text-white backdrop-blur-xl transition-all border border-white/10 pointer-events-auto flex items-center justify-center group/btn"
+                            >
+                                <svg className="w-6 h-6 group-hover/btn:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+
+                        {countdown && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-9xl md:text-[15rem] font-black text-white drop-shadow-[0_0_50px_rgba(255,255,255,0.5)] animate-ping">{countdown}</span>
                             </div>
                         )}
-                        {canSwitchCamera && (
-                            <button onClick={handleSwitchCamera} className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all">
-                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5m-1.5-1.5l-4-4m0 0l-4 4m4-4V19"/></svg>
-                            </button>
-                        )}
-                    </div>
-                )}
-                
-                {/* Visual Frame */}
-                <div className="absolute inset-0 border-[20px] border-black/20 pointer-events-none"></div>
-                <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-white/40 rounded-tl-lg pointer-events-none"></div>
-                <div className="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-white/40 rounded-tr-lg pointer-events-none"></div>
-                <div className="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-white/40 rounded-bl-lg pointer-events-none"></div>
-                <div className="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-white/40 rounded-br-lg pointer-events-none"></div>
-            </div>
 
-            <div className="flex items-center space-x-6">
-                <button onClick={onClose} className="text-[#a7a7a7] hover:text-white font-bold uppercase tracking-widest text-sm transition-all hover:scale-110">
-                    Cancel
-                </button>
-                <button 
-                    onClick={handleCapture} 
-                    className="group bg-[#1db954] hover:bg-[#1ed760] text-black font-black px-10 py-4 rounded-full flex items-center shadow-2xl transition-all hover:scale-105 active:scale-95 uppercase tracking-tighter text-lg"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                    Capture
-                </button>
+                        <div className="flex justify-center">
+                            <div className="bg-black/60 backdrop-blur-2xl px-6 py-3 rounded-2xl border border-violet-500/30 text-white flex items-center space-x-4">
+                                <div className="w-3 h-3 bg-cyan-400 rounded-full animate-ping"></div>
+                                <span className="text-xs font-black uppercase tracking-[0.2em] text-cyan-400">Position face in center</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Controls */}
+                <div className="h-28 bg-[#12121e] border-t border-white/5 flex items-center justify-center px-10 relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-violet-600/5 to-cyan-500/5 pointer-events-none"></div>
+                    
+                    <button 
+                        onClick={capturePhoto}
+                        disabled={isCapturing}
+                        className="w-20 h-20 rounded-full bg-white p-1 hover:scale-110 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] disabled:opacity-50 disabled:scale-100 group/shutter"
+                    >
+                        <div className="w-full h-full rounded-full border-4 border-black group-hover/shutter:border-violet-600 transition-colors flex items-center justify-center">
+                            <div className="w-12 h-12 bg-black rounded-full transition-all group-hover/shutter:scale-75"></div>
+                        </div>
+                    </button>
+
+                    <canvas ref={canvasRef} className="hidden" />
+                </div>
             </div>
         </div>
     );
 };
+
 export default CameraView;

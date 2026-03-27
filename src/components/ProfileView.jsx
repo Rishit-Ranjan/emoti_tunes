@@ -1,105 +1,72 @@
 import React from 'react';
 
-const ProfileView = ({ onBack }) => {
-    const user = {
-        name: "Rishit Ranjan",
-        email: "rishit@example.com",
-        plan: "EmotiTunes Premium",
-        joined: "March 2026",
-        stats: [
-            { label: "Playlists", value: "12" },
-            { label: "Followers", value: "128" },
-            { label: "Following", value: "64" }
-        ]
-    };
-
+const ProfileView = () => {
     return (
-        <div className="flex-1 overflow-y-auto w-full h-full bg-[#121212] rounded-md relative animate-in fade-in zoom-in duration-500">
-            {/* Header Background */}
-            <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-[#535353] to-[#121212] z-0"></div>
-            
-            <div className="relative z-10 p-8">
-                {/* Top Nav (simplified back button) */}
-                <button 
-                    onClick={onBack}
-                    className="mb-8 w-10 h-10 rounded-full bg-black/40 flex items-center justify-center text-white hover:bg-black/60 transition-colors"
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
-                </button>
-
-                <div className="flex flex-col md:flex-row items-center md:items-end space-y-6 md:space-y-0 md:space-x-8 mb-12">
-                    {/* Profile Picture */}
-                    <div className="w-48 h-48 rounded-full bg-[#282828] shadow-2xl overflow-hidden border-4 border-[#121212] flex-shrink-0 flex items-center justify-center">
-                        <img 
-                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} 
-                            alt="Profile" 
-                            className="w-full h-full object-cover"
-                        />
+        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-indigo-900/40 to-[#0a0a12] animate-in fade-in duration-700">
+            <div className="pt-32 pb-12 px-8 flex flex-col md:flex-row items-center md:items-end space-y-6 md:space-y-0 md:space-x-8">
+                {/* Profile Image with Ring */}
+                <div className="w-56 h-56 rounded-3xl bg-gradient-to-br from-violet-600 to-cyan-500 p-1 shadow-[0_20px_60px_rgba(139,92,246,0.3)]">
+                    <img 
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Rishit%20Ranjan`} 
+                        alt="Profile" 
+                        className="w-full h-full rounded-[20px] bg-[#1a1a2e]"
+                    />
+                </div>
+                
+                <div className="text-center md:text-left">
+                    <p className="uppercase text-xs font-black tracking-[0.3em] text-cyan-400 mb-2">Authenticated User</p>
+                    <h1 className="text-6xl md:text-8xl font-black text-white mb-6 tracking-tighter leading-none">Rishit Ranjan</h1>
+                    <div className="flex flex-wrap justify-center md:justify-start items-center gap-4 text-sm font-bold text-violet-200/60">
+                        <span className="bg-violet-600/20 text-violet-400 px-3 py-1 rounded-full border border-violet-500/20">Pro Member</span>
+                        <span>• 4 Public Playlists</span>
+                        <span>• 127 Songs Liked</span>
                     </div>
-                    
-                    <div className="text-center md:text-left">
-                        <p className="uppercase text-xs font-bold tracking-widest text-white mb-2">Profile</p>
-                        <h1 className="text-5xl md:text-8xl font-black text-white mb-6 tracking-tighter">{user.name}</h1>
-                        <div className="flex items-center space-x-2 text-sm font-semibold">
-                            <span>{user.plan}</span>
-                            <span className="text-[#a7a7a7]">•</span>
-                            <span className="text-white">{user.stats[0].value} Playlists</span>
-                            <span className="text-[#a7a7a7]">•</span>
-                            <span className="text-white">{user.stats[1].value} Followers</span>
-                            <span className="text-[#a7a7a7]">•</span>
-                            <span className="text-white">{user.stats[2].value} Following</span>
+                </div>
+            </div>
+
+            <div className="px-8 space-y-12 pb-24">
+                {/* Stats Grid */}
+                <div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-6">Mood Insights</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-[#1a1a2e]/50 p-8 rounded-3xl border border-white/5 hover:border-violet-500/30 transition-all">
+                            <p className="text-xs font-black text-violet-400 uppercase tracking-widest mb-2">Most Listened Mood</p>
+                            <p className="text-3xl font-black text-white uppercase tracking-tight">Focus & Chill</p>
+                        </div>
+                        <div className="bg-[#1a1a2e]/50 p-8 rounded-3xl border border-white/5 hover:border-violet-500/30 transition-all">
+                            <p className="text-xs font-black text-cyan-400 uppercase tracking-widest mb-2">Listening Time</p>
+                            <p className="text-3xl font-black text-white uppercase tracking-tight">42.5 Hours</p>
+                        </div>
+                        <div className="bg-[#1a1a2e]/50 p-8 rounded-3xl border border-white/5 hover:border-violet-500/30 transition-all">
+                            <p className="text-xs font-black text-pink-400 uppercase tracking-widest mb-2">Mood Accuracy</p>
+                            <p className="text-3xl font-black text-white uppercase tracking-tight">94% Positive</p>
                         </div>
                     </div>
                 </div>
 
-                {/* Content Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="bg-[#181818] p-6 rounded-lg hover:bg-[#282828] transition-colors cursor-default">
-                        <h3 className="text-xl font-bold mb-4">Account Details</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <p className="text-xs text-[#a7a7a7] uppercase font-bold tracking-widest mb-1">Email</p>
-                                <p className="text-white">{user.email}</p>
+                {/* Top Artists */}
+                <div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-8">Frequent Artists</h3>
+                    <div className="flex space-x-8 overflow-x-auto pb-6 scrollbar-hide">
+                        {[
+                            { name: "The Weeknd", id: "artist1" },
+                            { name: "Dua Lipa", id: "artist2" },
+                            { name: "Post Malone", id: "artist3" },
+                            { name: "Billie Eilish", id: "artist4" },
+                            { name: "Drake", id: "artist5" }
+                        ].map((artist) => (
+                            <div key={artist.id} className="flex-shrink-0 group cursor-pointer text-center w-32">
+                                <div className="w-32 h-32 rounded-2xl bg-[#1a1a2e] border border-white/5 mb-4 overflow-hidden shadow-2xl transition-all group-hover:scale-110 group-hover:rotate-3 group-hover:border-violet-500/50">
+                                    <img 
+                                        src={`https://picsum.photos/seed/${artist.id}/150/150`} 
+                                        alt={artist.name} 
+                                        className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
+                                    />
+                                </div>
+                                <p className="text-sm font-black text-white truncate uppercase tracking-tight">{artist.name}</p>
+                                <p className="text-[10px] font-black text-violet-400 uppercase tracking-widest mt-1">Pop / R&B</p>
                             </div>
-                            <div>
-                                <p className="text-xs text-[#a7a7a7] uppercase font-bold tracking-widest mb-1">Subscription</p>
-                                <p className="text-white">{user.plan}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-[#a7a7a7] uppercase font-bold tracking-widest mb-1">Member Since</p>
-                                <p className="text-white">{user.joined}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-[#181818] p-6 rounded-lg hover:bg-[#282828] transition-colors cursor-default flex flex-col justify-between">
-                        <div>
-                            <h3 className="text-xl font-bold mb-4">Top Artists this month</h3>
-                            <p className="text-sm text-[#a7a7a7] mb-6">Only visible to you</p>
-                            <div className="flex space-x-6 overflow-x-auto pb-4 scrollbar-hide">
-                                {[
-                                    { name: "The Weeknd", id: "wk" },
-                                    { name: "Dua Lipa", id: "dl" },
-                                    { name: "Drake", id: "dr" },
-                                    { name: "Taylor Swift", id: "ts" }
-                                ].map((artist, i) => (
-                                    <div key={artist.id} className="flex-shrink-0 group cursor-pointer text-center">
-                                        <div className="w-24 h-24 rounded-full bg-[#333] border border-[#444] mb-3 overflow-hidden shadow-xl transition-transform group-hover:scale-105">
-                                            <img 
-                                                src={`https://picsum.photos/seed/${artist.id}/150/150`} 
-                                                alt={artist.name} 
-                                                className="w-full h-full object-cover"
-                                            />
-                                        </div>
-                                        <p className="text-sm font-bold text-white truncate max-w-[96px]">{artist.name}</p>
-                                        <p className="text-xs text-[#a7a7a7]">Artist</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <button className="mt-8 self-start border border-[#a7a7a7] hover:border-white text-white px-6 py-2 rounded-full font-bold text-xs tracking-widest transition-all hover:scale-105">
-                            EDIT PROFILE
-                        </button>
+                        ))}
                     </div>
                 </div>
             </div>
