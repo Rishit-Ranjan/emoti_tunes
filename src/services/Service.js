@@ -100,6 +100,24 @@ const tryRequestFormats = async (prompt, options = {}) => {
                 max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
                 temperature: options.temperature || PHI_CONFIG.temperature
             }
+        },
+        // Format 5: Vision Chat Format (for multimodal/image analysis)
+        {
+            name: "Vision Chat Format",
+            body: {
+                model: FOUNDRY_MODEL,
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: options.promptText || prompt },
+                            ...(options.imageData ? [{ type: "image_url", image_url: { url: `data:image/jpeg;base64,${options.imageData}` } }] : [])
+                        ]
+                    }
+                ],
+                max_tokens: options.max_tokens || PHI_CONFIG.maxTokens,
+                temperature: options.temperature || PHI_CONFIG.temperature
+            }
         }
     ];
 
@@ -363,10 +381,40 @@ Ensure the output contains only the JSON. Do not include any conversational text
     }
 };
 
-// Emotion detection (using fallback since Phi-3.5 is text-only)
+// Emotion detection using multimodal Vision local LLM
 export const detectEmotionFromImage = async (base64ImageData) => {
-    console.log("📸 Image analysis skipped - Phi-3.5 is text-only model");
-    return 'Joy';
+    console.log("📸 Vision-based Emotion Recognition via local LLM");
+    
+    // Check cache
+    const cacheKey = `image_${base64ImageData.substring(0, 100)}`;
+    const cached = emotionCache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+        const promptText = "Identify the primary facial emotion of the person in this image. Respond ONLY with one of these words: Joy, Sadness, Anger, Excitement, Melancholy, Peaceful, Joy-Anger, Joy-Surprise, Joy-Excitement, Sad-Anger.";
+        
+        // Pass imageData through options so tryRequestFormats can use Vision format if supported
+        const response = await callFoundryPhi(promptText, { 
+            imageData: base64ImageData,
+            max_tokens: 15,
+            temperature: 0.1 // Lower for objective recognition tasks
+        });
+        
+        let text = response.text.trim().toLowerCase().replace(/[^a-z-]/g, '');
+        const moods = ['joy', 'sadness', 'anger', 'excitement', 'melancholy', 'peaceful', 'joy-anger', 'joy-surprise', 'joy-excitement', 'sad-anger'];
+        
+        const matchedMood = moods.find(m => text.includes(m));
+        if (matchedMood) {
+            const finalMood = matchedMood.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('-');
+            emotionCache.set(cacheKey, finalMood);
+            return finalMood;
+        }
+
+        return 'Joy';
+    } catch (error) {
+        console.warn("⚠️ Vision analysis failed (may need multimodal model like Llava), falling back to Joy:", error.message);
+        return 'Joy';
+    }
 };
 
 export const detectEmotionFromAudio = async (base64AudioData, mimeType, aerFeatures) => {
