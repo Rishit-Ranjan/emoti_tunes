@@ -285,20 +285,31 @@ export const detectEmotionFromImage = async (base64ImageData) => {
 };
 
 export const detectEmotionFromAudio = async (base64AudioData, mimeType, aerFeatures) => {
-    console.log("🎤 Audio Emotion Recognition (AER) via wave features:", aerFeatures);
+    console.log("🎤 Audio Emotion Recognition (AER) via native audio + wave features:", aerFeatures);
     const model = getModel();
     if (!model) return "Joy";
-    if (!aerFeatures) return 'Joy';
+    if (!aerFeatures || !base64AudioData) return 'Joy';
 
     try {
-        const prompt = `Perform Audio Emotion Recognition (AER) on the following extracted audio wave features:
+        const prompt = `Perform Audio Emotion Recognition (AER) utilizing both the raw audio file and the following extracted features:
 - Average Energy (Volume): ${aerFeatures.avgEnergy.toFixed(2)}
 - Average Peak Frequency (Pitch): ${aerFeatures.avgFreq.toFixed(2)} Hz
 - Vocal Stability (Variance): ${aerFeatures.stability.toFixed(2)}
 
-Identify the user's emotion. Respond ONLY with one of these words: Joy, Sadness, Anger, Excitement, Melancholy, Peaceful, Joy-Anger, Joy-Surprise, Joy-Excitement, Sad-Anger.`;
+Listen to the attached audio recording to capture the user's exact tonality and emotion.
+Identify the user's emotion. Respond ONLY with one of these exact words: Joy, Sadness, Anger, Excitement, Melancholy, Peaceful, Joy-Anger, Joy-Surprise, Joy-Excitement, Sad-Anger.`;
 
-        const result = await model.generateContent(prompt);
+        const cleanBase64 = base64AudioData.includes(',') ? base64AudioData.split(',')[1] : base64AudioData;
+
+        const result = await model.generateContent([
+            {
+                inlineData: {
+                    data: cleanBase64,
+                    mimeType: mimeType || "audio/webm"
+                }
+            },
+            prompt
+        ]);
         const response = await result.response;
         let text = response.text().trim().toLowerCase().replace(/[^a-z-]/g, '');
 
