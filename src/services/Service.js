@@ -95,144 +95,123 @@ const withRetry = async (fn, context, retries = CONFIG.retryAttempts) => {
     }
 };
 
-// Fallback playlists
+// Fallback playlists with verified YouTube IDs
 const FALLBACK_PLAYLISTS = {
     'Joy': [
-        { title: "Happy", artist: "Pharrell Williams" },
-        { title: "Walking on Sunshine", artist: "Katrina and the Waves" },
-        { title: "Can't Stop the Feeling!", artist: "Justin Timberlake" },
-        { title: "Uptown Funk", artist: "Mark Ronson ft. Bruno Mars" },
-        { title: "Good Vibrations", artist: "The Beach Boys" },
-        { title: "September", artist: "Earth, Wind & Fire" },
-        { title: "Best Day of My Life", artist: "American Authors" },
-        { title: "I Gotta Feeling", artist: "The Black Eyed Peas" },
-        { title: "Shut Up and Dance", artist: "Walk The Moon" },
-        { title: "Roar", artist: "Katy Perry" }
+        { title: "Happy", artist: "Pharrell Williams", youtubeId: "y6Sxv-sUYtM" },
+        { title: "Walking on Sunshine", artist: "Katrina and the Waves", youtubeId: "iPUmE-tne5U" },
+        { title: "Can't Stop the Feeling!", artist: "Justin Timberlake", youtubeId: "ru0K8uYEZWw" },
+        { title: "Uptown Funk", artist: "Mark Ronson ft. Bruno Mars", youtubeId: "OPf0YbXqDm0" },
+        { title: "Good Vibrations", artist: "The Beach Boys", youtubeId: "Eab_beh07HU" },
+        { title: "September", artist: "Earth, Wind & Fire", youtubeId: "Gs069dndIYk" },
+        { title: "Best Day of My Life", artist: "American Authors", youtubeId: "Y66j_BUCBMY" },
+        { title: "I Gotta Feeling", artist: "The Black Eyed Peas", youtubeId: "uSD4vsh1zDA" },
+        { title: "Shut Up and Dance", artist: "Walk The Moon", youtubeId: "6JCLY0Rlx6Q" },
+        { title: "Roar", artist: "Katy Perry", youtubeId: "CevxZvSJLk8" }
     ],
     'Sadness': [
-        { title: "Someone Like You", artist: "Adele" },
-        { title: "Fix You", artist: "Coldplay" },
-        { title: "The Sound of Silence", artist: "Simon & Garfunkel" },
-        { title: "Yesterday", artist: "The Beatles" },
-        { title: "Hurt", artist: "Johnny Cash" },
-        { title: "All I Want", artist: "Kodaline" },
-        { title: "Skinny Love", artist: "Bon Iver" },
-        { title: "Stay With Me", artist: "Sam Smith" },
-        { title: "Let Her Go", artist: "Passenger" },
-        { title: "Tears in Heaven", artist: "Eric Clapton" }
+        { title: "Someone Like You", artist: "Adele", youtubeId: "hLQl3WQQoQ0" },
+        { title: "Fix You", artist: "Coldplay", youtubeId: "k4V3Mo61fJM" },
+        { title: "The Sound of Silence", artist: "Simon & Garfunkel", youtubeId: "4zLfCnGVeL4" },
+        { title: "Yesterday", artist: "The Beatles", youtubeId: "jo505ZyaCbA" },
+        { title: "Hurt", artist: "Johnny Cash", youtubeId: "8AHCfZTRGiI" },
+        { title: "All I Want", artist: "Kodaline", youtubeId: "mtf7hC17IBM" },
+        { title: "Skinny Love", artist: "Bon Iver", youtubeId: "ssdgFoHLwnk" },
+        { title: "Stay With Me", artist: "Sam Smith", youtubeId: "pB-5XG-DbAA" },
+        { title: "Let Her Go", artist: "Passenger", youtubeId: "RBumgq5yVrA" },
+        { title: "Tears in Heaven", artist: "Eric Clapton", youtubeId: "JxPj3GAYYZ0" }
     ],
     'Anger': [
-        { title: "Killing in the Name", artist: "Rage Against the Machine" },
-        { title: "Break Stuff", artist: "Limp Bizkit" },
-        { title: "In the End", artist: "Linkin Park" },
-        { title: "Smells Like Teen Spirit", artist: "Nirvana" },
-        { title: "Chop Suey!", artist: "System of a Down" },
-        { title: "Du Hast", artist: "Rammstein" },
-        { title: "Bodies", artist: "Drowning Pool" },
-        { title: "Given Up", artist: "Linkin Park" },
-        { title: "Down with the Sickness", artist: "Disturbed" },
-        { title: "Headstrong", artist: "Trapt" }
+        { title: "Break Stuff", artist: "Limp Bizkit", youtubeId: "ZpUYjpKg9KY" },
+        { title: "In the End", artist: "Linkin Park", youtubeId: "eVTXPUF4Oz4" },
+        { title: "Smells Like Teen Spirit", artist: "Nirvana", youtubeId: "hTWKbfoikeg" },
+        { title: "Du Hast", artist: "Rammstein", youtubeId: "W3q8Od5qJio" },
+        { title: "Down with the Sickness", artist: "Disturbed", youtubeId: "09LTT0rkYls" },
+        { title: "Headstrong", artist: "Trapt", youtubeId: "HTvu1Yr3Ohk" }
     ],
     'Excitement': [
-        { title: "Eye of the Tiger", artist: "Survivor" },
-        { title: "Don't Stop Me Now", artist: "Queen" },
-        { title: "Lose Yourself", artist: "Eminem" },
-        { title: "Titanium", artist: "David Guetta ft. Sia" },
-        { title: "Levels", artist: "Avicii" },
-        { title: "Can't Hold Us", artist: "Macklemore & Ryan Lewis" },
-        { title: "Thunderstruck", artist: "AC/DC" },
-        { title: "Seven Nation Army", artist: "The White Stripes" },
-        { title: "Wake Me Up", artist: "Avicii" },
-        { title: "Party Rock Anthem", artist: "LMFAO" }
+        { title: "Eye of the Tiger", artist: "Survivor", youtubeId: "btPJPFnesVw" },
+        { title: "Don't Stop Me Now", artist: "Queen", youtubeId: "HgzGwKwLmgM" },
+        { title: "Lose Yourself", artist: "Eminem", youtubeId: "_Yhyp-_hX2s" },
+        { title: "Levels", artist: "Avicii", youtubeId: "_ovdm2yX4MA" },
+        { title: "Wake Me Up", artist: "Avicii", youtubeId: "IcrbM1l_BoI" }
     ],
     'Melancholy': [
-        { title: "Video Games", artist: "Lana Del Rey" },
-        { title: "The Night We Met", artist: "Lord Huron" },
-        { title: "Exile", artist: "Taylor Swift ft. Bon Iver" },
-        { title: "Holocene", artist: "Bon Iver" },
-        { title: "Summertime Sadness", artist: "Lana Del Rey" },
-        { title: "Liability", artist: "Lorde" },
-        { title: "Writer in the Dark", artist: "Lorde" },
-        { title: "Slow Dancing in a Burning Room", artist: "John Mayer" },
-        { title: "Landslide", artist: "Fleetwood Mac" },
-        { title: "Black", artist: "Pearl Jam" }
+        { title: "Video Games", artist: "Lana Del Rey", youtubeId: "cE6wxDqdOV0" },
+        { title: "The Night We Met", artist: "Lord Huron", youtubeId: "KtlgYxa6BMU" },
+        { title: "Summertime Sadness", artist: "Lana Del Rey", youtubeId: "TdrL3QxjyVw" }
     ],
     'Peaceful': [
-        { title: "Weightless", artist: "Marconi Union" },
-        { title: "Clair de Lune", artist: "Debussy" },
-        { title: "River Flows in You", artist: "Yiruma" },
-        { title: "Gymnopédie No.1", artist: "Erik Satie" },
-        { title: "Spiegel im Spiegel", artist: "Arvo Pärt" },
-        { title: "Holocene", artist: "Bon Iver" },
-        { title: "Sunrise", artist: "Norah Jones" },
-        { title: "Banana Pancakes", artist: "Jack Johnson" },
-        { title: "Come Away With Me", artist: "Norah Jones" },
-        { title: "Put Your Records On", artist: "Corinne Bailey Rae" }
+        { title: "Weightless", artist: "Marconi Union", youtubeId: "UfcAVejslrU" },
+        { title: "River Flows in You", artist: "Yiruma", youtubeId: "7maJOI3QMu0" },
+        { title: "Banana Pancakes", artist: "Jack Johnson", youtubeId: "OkyrIRyrW60" }
     ],
     'default': [
-        { title: "Bohemian Rhapsody", artist: "Queen" },
-        { title: "Imagine", artist: "John Lennon" },
-        { title: "Hotel California", artist: "Eagles" },
-        { title: "Billie Jean", artist: "Michael Jackson" },
-        { title: "Like a Rolling Stone", artist: "Bob Dylan" },
-        { title: "Smells Like Teen Spirit", artist: "Nirvana" },
-        { title: "What's Going On", artist: "Marvin Gaye" },
-        { title: "Respect", artist: "Aretha Franklin" },
-        { title: "Good Vibrations", artist: "The Beach Boys" },
-        { title: "Hey Jude", artist: "The Beatles" }
+        { title: "Bohemian Rhapsody", artist: "Queen", youtubeId: "fJ9rUzIMcZQ" },
+        { title: "Hotel California", artist: "Eagles", youtubeId: "09839DpTctU" },
+        { title: "Billie Jean", artist: "Michael Jackson", youtubeId: "Zi_XLOBDo_Y" }
     ]
 };
 
-// Main exported function: generatePlaylist
-export const generatePlaylist = async (emotion) => {
-    const model = getModel();
-    if (!model) {
-        console.warn("⚠️ Gemini API Key missing or initialization failed. Using fallback playlists.");
-        return getFallback(emotion);
-    }
-
+// Helper to get model by name
+const getModelByName = (name) => {
+    const rawKey = import.meta.env.VITE_GEMINI_API_KEY?.trim();
+    if (!rawKey) return null;
     try {
-        const prompt = `Generate a fresh, unique, and diverse playlist of 10 songs that perfectly capture the feeling of '${emotion}'. 
+        const ai = new GoogleGenerativeAI(rawKey);
+        // Explicitly use the provided name, ensuring it has 'models/' prefix if needed
+        const modelName = name.startsWith('models/') ? name : `models/${name}`;
+        return ai.getGenerativeModel({ model: modelName });
+    } catch (e) {
+        return null;
+    }
+};
+
+const MODELS_TO_TRY = [
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-pro",
+    "gemini-1.5-pro",
+    "gemini-1.0-pro"
+];
+
+export const generatePlaylist = async (emotion) => {
+    for (const modelName of MODELS_TO_TRY) {
+        const model = getModelByName(modelName);
+        if (!model) continue;
+
+        try {
+            console.log(`📡 Vibe Sync: Attempting ${modelName}...`);
+            const prompt = `Generate a fresh, unique, and diverse playlist of 10 songs that perfectly capture the feeling of '${emotion}'. 
 
 Return ONLY a valid JSON object with this exact structure:
 {
     "songs": [
-        {"title": "Song Title", "artist": "Artist Name", "youtubeId": "XXXXXXXXXXX"},
-        {"title": "Another Song", "artist": "Another Artist", "youtubeId": "YYYYYYYYYYY"}
+        {"title": "Song Title", "artist": "Artist Name", "youtubeId": "XXXXXXXXXXX"}
     ]
 }
 
-Do not include any conversational text. Respond with JSON only. Ensure the youtubeId is accurate for full song playback.`;
+Ensure youtubeId is accurate. No conversational text.`;
 
-        const response = await withRetry(
-            async () => {
-                const result = await model.generateContent(prompt);
-                return result.response.text();
-            },
-            `playlist generation for ${emotion}`
-        );
-
-        const jsonText = cleanJsonString(response);
-        let parsed;
-
-        try {
-            parsed = JSON.parse(jsonText);
-        } catch (parseError) {
-            console.error("Failed to parse playlist JSON:", jsonText, parseError);
-            throw new Error("Invalid Gemini response format.");
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
+            
+            const jsonText = cleanJsonString(text);
+            const parsed = JSON.parse(jsonText);
+            
+            if (parsed && (parsed.songs || Array.isArray(parsed))) {
+                console.log(`✅ Intelligence Link Established: ${modelName}`);
+                return parsed.songs || parsed;
+            }
+        } catch (error) {
+            console.error(`❌ Model ${modelName} Connection Failed:`, error.message);
+            // If it's a 429, we might want to wait, but for 404 we skip immediately
         }
-
-        if (parsed && Array.isArray(parsed.songs)) {
-            return parsed.songs;
-        } else if (Array.isArray(parsed)) {
-            return parsed;
-        } else {
-            throw new Error("The AI returned a playlist, but its structure was not what we expected.");
-        }
-    } catch (error) {
-        console.warn(`⚠️ Gemini failed. Using fallback for emotion: ${emotion}.`, error.message);
-        return getFallback(emotion);
     }
+
+    console.warn("⚠️ System Fallback: All AI models offline. Activating Curated Vibe protocols.");
+    return getFallback(emotion);
 };
 
 const getFallback = (emotion) => {
