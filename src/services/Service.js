@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_FOUNDRY_ENDPOINT || '/api/foundry';
+const FOUNDRY_BASE_URL = '/api/foundry';
+const OLLAMA_BASE_URL = '/api/ollama';
+
 const PLAYLIST_MODEL = 'phi3.5:latest';
 const VISION_MODEL = 'llava:latest';
 
@@ -57,7 +59,9 @@ const checkOnlineStatus = async () => {
 
 // Try multiple request formats
 const tryRequestFormats = async (prompt, options = {}) => {
-    const targetModel = options.model || PLAYLIST_MODEL;
+    const isVisionTask = !!options.imageData;
+    const targetBaseUrl = isVisionTask ? OLLAMA_BASE_URL : FOUNDRY_BASE_URL;
+    const targetModel = options.model || (isVisionTask ? VISION_MODEL : PLAYLIST_MODEL);
     
     const formats = [
         // Format 1: OpenAI chat format with system message
@@ -181,9 +185,9 @@ const tryRequestFormats = async (prompt, options = {}) => {
             let endpoint;
             
             if (format.path) {
-                endpoint = `${API_BASE_URL}${format.path}`;
+                endpoint = `${targetBaseUrl}${format.path}`;
             } else {
-                endpoint = isChatFormat ? `${API_BASE_URL}/v1/chat/completions` : `${API_BASE_URL}/v1/completions`;
+                endpoint = isChatFormat ? `${targetBaseUrl}/v1/chat/completions` : `${targetBaseUrl}/v1/completions`;
             }
             
             const response = await fetch(endpoint, {
