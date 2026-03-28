@@ -150,7 +150,10 @@ const App = () => {
             const results = EMOTIONS.filter(e => 
                 e.name.toLowerCase().includes(query.toLowerCase()) || 
                 e.description.toLowerCase().includes(query.toLowerCase()) ||
-                (e.recommendations && e.recommendations.some(s => s.toLowerCase().includes(query.toLowerCase())))
+                (e.recommendations && e.recommendations.some(s => 
+                    s.title.toLowerCase().includes(query.toLowerCase()) || 
+                    s.artist.toLowerCase().includes(query.toLowerCase())
+                ))
             );
             setSearchResults(results);
         } else if (view === 'search') {
@@ -235,13 +238,19 @@ const App = () => {
                                             <div className="mt-6 pt-6 border-t border-white/5 space-y-3">
                                                 <div className="flex items-center space-x-2">
                                                     <svg className="w-3 h-3 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V7.82l8-1.6V11.114A4.369 4.369 0 0015 11c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V3z"/></svg>
-                                                    <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Vibe Previews</span>
+                                                    <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Spotify-style Previews</span>
                                                 </div>
-                                                <div className="flex flex-wrap gap-2">
+                                                <div className="space-y-2">
                                                     {emotion.recommendations.map(song => (
-                                                        <span key={song} className="text-[9px] font-bold px-3 py-1.5 bg-white/5 rounded-xl text-cyan-400/80 border border-white/5 group-hover:bg-white/10 group-hover:text-cyan-400 transition-colors">
-                                                            {song}
-                                                        </span>
+                                                        <div key={song.title} className="flex items-center space-x-3 p-2 rounded-xl hover:bg-white/5 transition-colors group/track">
+                                                            <div className="w-8 h-8 bg-black/40 rounded flex items-center justify-center text-cyan-400 group-hover/track:bg-cyan-400 group-hover/track:text-black transition-all">
+                                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"/></svg>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-[10px] font-bold text-white truncate">{song.title}</p>
+                                                                <p className="text-[8px] font-medium text-white/40 truncate uppercase tracking-wider">{song.artist}</p>
+                                                            </div>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             </div>

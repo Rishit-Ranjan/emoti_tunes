@@ -6,7 +6,11 @@ export const EMOTIONS = [
         icon: HappyIcon,
         color: 'text-yellow-300',
         gradient: 'from-yellow-500/10 to-[#0a0a12]',
-        recommendations: ['Walking on Sunshine', 'Happy', 'Good Vibrations']
+        recommendations: [
+            { title: 'Walking on Sunshine', artist: 'Katrina & The Waves' },
+            { title: 'Happy', artist: 'Pharrell Williams' },
+            { title: 'Good Vibrations', artist: 'The Beach Boys' }
+        ]
     },
     {
         name: 'Sadness',
@@ -14,7 +18,11 @@ export const EMOTIONS = [
         icon: SadIcon,
         color: 'text-blue-300',
         gradient: 'from-blue-500/10 to-[#0a0a12]',
-        recommendations: ['Someone Like You', 'Fix You', 'Yesterday']
+        recommendations: [
+            { title: 'Someone Like You', artist: 'Adele' },
+            { title: 'Fix You', artist: 'Coldplay' },
+            { title: 'Yesterday', artist: 'The Beatles' }
+        ]
     },
     {
         name: 'Anger',
@@ -22,7 +30,11 @@ export const EMOTIONS = [
         icon: AngryIcon,
         color: 'text-red-400',
         gradient: 'from-red-500/10 to-[#0a0a12]',
-        recommendations: ['Break Stuff', 'Killing In The Name', 'Bulls On Parade']
+        recommendations: [
+            { title: 'Break Stuff', artist: 'Limp Bizkit' },
+            { title: 'Killing In The Name', artist: 'Rage Against The Machine' },
+            { title: 'Bulls On Parade', artist: 'Rage Against The Machine' }
+        ]
     },
     {
         name: 'Excitement',
@@ -30,7 +42,11 @@ export const EMOTIONS = [
         icon: JoyfulIcon,
         color: 'text-orange-400',
         gradient: 'from-orange-500/10 to-[#0a0a12]',
-        recommendations: ["Can't Stop", 'Thunderstruck', 'Mr. Brightside']
+        recommendations: [
+            { title: "Can't Stop", artist: 'Red Hot Chili Peppers' },
+            { title: 'Thunderstruck', artist: 'AC/DC' },
+            { title: 'Mr. Brightside', artist: 'The Killers' }
+        ]
     },
     {
         name: 'Melancholy',
@@ -38,7 +54,11 @@ export const EMOTIONS = [
         icon: MelancholyIcon,
         color: 'text-indigo-300',
         gradient: 'from-indigo-500/10 to-[#0a0a12]',
-        recommendations: ['Creep', 'Hurt', 'The Night We Met']
+        recommendations: [
+            { title: 'Creep', artist: 'Radiohead' },
+            { title: 'Hurt', artist: 'Johnny Cash' },
+            { title: 'The Night We Met', artist: 'Lord Huron' }
+        ]
     },
     {
         name: 'Peaceful',
@@ -46,7 +66,11 @@ export const EMOTIONS = [
         icon: EnergeticIcon,
         color: 'text-green-300',
         gradient: 'from-green-500/10 to-[#0a0a12]',
-        recommendations: ['Weightless', 'River Flows In You', 'Claire de Lune']
+        recommendations: [
+            { title: 'Weightless', artist: 'Marconi Union' },
+            { title: 'River Flows In You', artist: 'Yiruma' },
+            { title: 'Clair de Lune', artist: 'Claude Debussy' }
+        ]
     },
     {
         name: 'Joy-Anger',
@@ -54,7 +78,11 @@ export const EMOTIONS = [
         icon: AngryIcon,
         color: 'text-orange-400',
         gradient: 'from-orange-500/10 to-[#0a0a12]',
-        recommendations: ['Power', 'Survivor', 'Eye of the Tiger']
+        recommendations: [
+            { title: 'Power', artist: 'Kanye West' },
+            { title: 'Survivor', artist: 'Destiny\'s Child' },
+            { title: 'Eye of the Tiger', artist: 'Survivor' }
+        ]
     },
     {
         name: 'Joy-Surprise',
@@ -62,7 +90,11 @@ export const EMOTIONS = [
         icon: JoyfulIcon,
         color: 'text-pink-400',
         gradient: 'from-pink-500/10 to-[#0a0a12]',
-        recommendations: ['September', 'Uptown Funk', 'Sugar']
+        recommendations: [
+            { title: 'September', artist: 'Earth, Wind & Fire' },
+            { title: 'Uptown Funk', artist: 'Mark Ronson ft. Bruno Mars' },
+            { title: 'Sugar', artist: 'Maroon 5' }
+        ]
     },
     {
         name: 'Joy-Excitement',
@@ -70,7 +102,11 @@ export const EMOTIONS = [
         icon: HappyIcon,
         color: 'text-lime-300',
         gradient: 'from-lime-500/10 to-[#0a0a12]',
-        recommendations: ['Levitating', 'Shut Up and Dance', 'Shake It Off']
+        recommendations: [
+            { title: 'Levitating', artist: 'Dua Lipa' },
+            { title: 'Shut Up and Dance', artist: 'Walk The Moon' },
+            { title: 'Shake It Off', artist: 'Taylor Swift' }
+        ]
     },
     {
         name: 'Sad-Anger',
@@ -78,6 +114,10 @@ export const EMOTIONS = [
         icon: SadIcon,
         color: 'text-purple-400',
         gradient: 'from-purple-500/10 to-[#0a0a12]',
-        recommendations: ['In the End', 'Numb', 'Liability']
+        recommendations: [
+            { title: 'In the End', artist: 'Linkin Park' },
+            { title: 'Numb', artist: 'Linkin Park' },
+            { title: 'Liability', artist: 'Lorde' }
+        ]
     }
 ];
