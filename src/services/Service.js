@@ -171,8 +171,8 @@ const MODELS_TO_TRY = [
     "gemini-1.5-flash",
     "gemini-1.5-flash-latest",
     "gemini-pro",
-    "gemini-1.5-pro",
-    "gemini-1.0-pro"
+    "gemini-1.0-pro",
+    "gemini-2.5-flash",
 ];
 
 export const generatePlaylist = async (emotion) => {
