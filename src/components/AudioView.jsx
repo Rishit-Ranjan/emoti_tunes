@@ -78,6 +78,7 @@ const AudioView = ({ onCapture, onClose, onError }) => {
         } catch (err) {
             console.error("Microphone access error:", err);
             onError("Could not access microphone.");
+            closeAudio();
         }
     };
 

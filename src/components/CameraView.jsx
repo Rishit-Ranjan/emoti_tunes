@@ -47,6 +47,7 @@ const CameraView = ({ onCapture, onClose, onError }) => {
         } catch (err) {
             console.error("Camera access error:", err);
             onError("Could not access camera. Please check permissions.");
+            closeCamera();
         }
     }, [onError]);
 

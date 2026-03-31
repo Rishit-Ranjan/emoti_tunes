@@ -31,10 +31,6 @@ const App = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchActive, setIsSearchActive] = useState(false);
     
-    // Create Playlist Modal State
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [newPlaylistName, setNewPlaylistName] = useState('');
-
     useEffect(() => {
         const handleOnline = () => {
             setIsOffline(false);
@@ -57,6 +53,8 @@ const App = () => {
         setHistory(newHistory);
         setHistoryIndex(newHistory.length - 1);
         setView(newView);
+        setError(null);
+        setIsLoading(false);
         if (newView !== 'search') setIsSearchActive(false);
     };
 
@@ -77,12 +75,8 @@ const App = () => {
     };
 
     const handleEmotionSelect = useCallback(async (emotion) => {
-        if (isOffline) {
-            setError("You're offline. Please connect to the internet to generate a playlist.");
-            return;
-        }
         setCurrentEmotion(emotion);
-        setLoadingMessage(`Generating ${emotion.name} vibe...`);
+        setLoadingMessage(isOffline ? `Offline mode: using cached ${emotion.name} vibe...` : `Generating ${emotion.name} vibe...`);
         setIsLoading(true);
         setError(null);
         setPlaylist([]);
@@ -107,33 +101,6 @@ const App = () => {
         setIsLoading(false);
         navigateTo('home');
     }, []);
-
-    const openSaveModal = () => {
-        if (playlist.length === 0) {
-            setError(null);
-            navigateTo('home');
-            return;
-        }
-        setNewPlaylistName(`${currentEmotion?.name || 'My'} Vibe Collection`);
-        setIsCreateModalOpen(true);
-    };
-
-    const handleSavePlaylist = () => {
-        if (!newPlaylistName.trim()) {
-            alert("Please enter a collection name.");
-            return;
-        }
-        const pl = {
-            id: Date.now(),
-            name: newPlaylistName.trim(),
-            songs: [...playlist],
-            emotion: currentEmotion ? {...currentEmotion} : null
-        };
-        setUserPlaylists(prev => [pl, ...prev]);
-        setIsCreateModalOpen(false);
-        setNewPlaylistName('');
-        navigateTo('library');
-    };
 
     const handleSelectSavedPlaylist = (pl) => {
         setPlaylist(pl.songs);
@@ -206,7 +173,7 @@ const App = () => {
             case 'profile': return <ProfileView currentVibe={currentEmotion?.name || 'Joy'} onBack={goBack} />;
             case 'camera': return <CameraView onCapture={handleCapture} onClose={goBack} onError={setError}/>;
             case 'mic': return <AudioView onCapture={handleAudioCapture} onClose={goBack} onError={setError}/>;
-            case 'playlist': return <PlaylistDisplay playlist={playlist} emotion={currentEmotion} onReset={handleReset} onSave={openSaveModal}/>;
+            case 'playlist': return <PlaylistDisplay playlist={playlist} emotion={currentEmotion} onReset={handleReset}/>;
             case 'library': return <LibraryView playlists={userPlaylists} onSelectPlaylist={handleSelectSavedPlaylist} />;
             case 'search': return (
                 <div className="flex-1 p-10 bg-[#0a0a12] overflow-y-auto">
@@ -294,24 +261,11 @@ const App = () => {
                         <span className="font-black uppercase text-xs tracking-[0.2em]">Library</span>
                     </button>
                     
-                    <div className="pt-8 border-t border-white/5 mt-8 opacity-40">
-                         <span className="px-5 text-[10px] font-black uppercase tracking-[0.3em] text-white">Quick Actions</span>
-                    </div>
 
-                    <button onClick={openSaveModal} className="w-full flex items-center space-x-5 px-5 py-4 rounded-2xl text-violet-200/40 hover:text-white hover:bg-white/5 transition-all group">
-                        <div className="w-6 h-6 bg-violet-600/10 rounded-lg flex items-center justify-center text-violet-500 group-hover:bg-violet-600 group-hover:text-white transition-all"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path d="M12 4v16m8-8H4"/></svg></div>
-                        <span className="font-black uppercase text-xs tracking-[0.2em]">Create Playlist</span>
-                    </button>
+
                 </nav>
 
-                <div className="pb-10 pt-4 space-y-3">
-                    <div className="bg-gradient-to-br from-violet-900/50 to-indigo-950 p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/10 rounded-full blur-2xl -mr-12 -mt-12 transition-all group-hover:bg-cyan-400/20"></div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-cyan-400 mb-2">Pro Feature</h4>
-                        <p className="text-[11px] font-bold text-violet-200/60 uppercase leading-relaxed tracking-wider mb-4">Lossless Streaming & Advanced Mood AI</p>
-                        <button className="w-full py-2 bg-white text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-transform">Get Ultra</button>
-                    </div>
-                </div>
+
             </div>
 
             {/* Main Area */}
@@ -327,31 +281,6 @@ const App = () => {
                         </button>
                     </div>
 
-                    {/* Centered Large Search Bar */}
-                    <div className="flex justify-center flex-1 max-w-2xl px-8">
-                        <div className={`relative flex items-center transition-all duration-700 ${isSearchActive ? 'w-full bg-white/5 rounded-2xl border border-white/10 shadow-2xl p-1' : 'w-14'}`}>
-                            <button 
-                                onClick={() => {
-                                    const next = !isSearchActive;
-                                    setIsSearchActive(next);
-                                    if (!next) {
-                                        setSearchQuery('');
-                                        if (view === 'search') goBack();
-                                    }
-                                }}
-                                className={`h-14 flex items-center justify-center transition-all ${isSearchActive ? 'w-14 rounded-xl' : 'w-14 rounded-2xl bg-[#1a1a2e] border border-white/10 shadow-xl hover:scale-110 active:scale-95 text-white'}`}
-                            >
-                                <svg className={`w-6 h-6 ${isSearchActive ? 'text-cyan-400 rotate-90' : 'text-current'} transition-all`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                            </button>
-                            <input 
-                                type="text"
-                                placeholder={isSearchActive ? "Explore moods, songs, vibes..." : ""}
-                                value={searchQuery}
-                                onChange={(e) => handleSearch(e.target.value)}
-                                className={`h-14 pr-6 bg-transparent text-white outline-none transition-all duration-700 font-bold uppercase text-[10px] tracking-widest ${isSearchActive ? 'w-full opacity-100 pl-4' : 'w-0 opacity-0 pointer-events-none'}`}
-                            />
-                        </div>
-                    </div>
 
                     <div className="flex items-center space-x-6">
                         <button className="flex items-center space-x-4 bg-black/60 backdrop-blur-xl py-2 px-5 rounded-full border border-white/10 group active:scale-95 transition-all text-left" onClick={() => navigateTo('profile')}>
@@ -373,40 +302,6 @@ const App = () => {
                 </main>
             </div>
 
-            {/* Create Playlist Modal (Premium Overlay) */}
-            {isCreateModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 animate-in fade-in duration-300">
-                    <div className="absolute inset-0 bg-[#0a0a12]/95 backdrop-blur-3xl" onClick={() => setIsCreateModalOpen(false)}></div>
-                    <div className="relative w-full max-w-lg bg-[#12121e] rounded-[3rem] p-12 shadow-[0_50px_100px_rgba(0,0,0,0.8)] border border-white/5 flex flex-col items-center text-center space-y-10 animate-in zoom-in-95 duration-500">
-                        <div className="w-24 h-24 bg-violet-600/10 rounded-[2rem] flex items-center justify-center text-violet-500 shadow-2xl border border-violet-500/20">
-                            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
-                        </div>
-                        
-                        <div className="space-y-4">
-                            <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none italic underline decoration-cyan-400 decoration-4 underline-offset-8">Capture Vibe</h2>
-                            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em]">Seal your emotional state into a vault</p>
-                        </div>
-
-                        <div className="w-full space-y-2">
-                             <p className="text-left text-[8px] font-black text-cyan-400 uppercase tracking-widest px-6">Collection Identity</p>
-                             <input 
-                                type="text"
-                                autoFocus
-                                value={newPlaylistName}
-                                onChange={(e) => setNewPlaylistName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSavePlaylist()}
-                                className="w-full bg-white/5 border border-white/10 px-8 py-5 rounded-2xl outline-none text-white font-black text-lg uppercase tracking-tight focus:border-violet-600 transition-all placeholder:text-white/10"
-                                placeholder="Enter Collection Name..."
-                             />
-                        </div>
-
-                        <div className="flex flex-col w-full space-y-4">
-                            <button onClick={handleSavePlaylist} className="w-full py-5 bg-white text-black rounded-2xl font-black uppercase text-xs tracking-[0.3em] hover:scale-105 active:scale-95 transition-all shadow-2xl">Create Collection</button>
-                            <button onClick={() => setIsCreateModalOpen(false)} className="w-full py-4 text-white/20 font-black uppercase text-[10px] tracking-[0.2em] hover:text-white transition-colors">Discard</button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
