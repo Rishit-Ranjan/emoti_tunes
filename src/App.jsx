@@ -174,7 +174,7 @@ const App = () => {
             case 'camera': return <CameraView onCapture={handleCapture} onClose={goBack} onError={setError}/>;
             case 'mic': return <AudioView onCapture={handleAudioCapture} onClose={goBack} onError={setError}/>;
             case 'playlist': return <PlaylistDisplay playlist={playlist} emotion={currentEmotion} onReset={handleReset}/>;
-            case 'library': return <LibraryView playlists={userPlaylists} onSelectPlaylist={handleSelectSavedPlaylist} />;
+            case 'library': return <LibraryView playlists={userPlaylists} onSelectPlaylist={handleSelectSavedPlaylist} onCreateFirstVibe={() => navigateTo('camera')} />;
             case 'search': return (
                 <div className="flex-1 p-10 bg-[#0a0a12] overflow-y-auto">
                     <div className="max-w-5xl mx-auto">

@@ -1,6 +1,6 @@
 import React from 'react';
 
-const LibraryView = ({ playlists, onSelectPlaylist }) => {
+const LibraryView = ({ playlists, onSelectPlaylist, onCreateFirstVibe }) => {
     return (
         <div className="flex-1 overflow-y-auto bg-[#0a0a12] animate-in fade-in duration-700">
             <div className="pt-32 pb-12 px-8">
@@ -23,7 +23,7 @@ const LibraryView = ({ playlists, onSelectPlaylist }) => {
                             <h3 className="text-2xl font-black text-white uppercase tracking-tight">Your library is empty</h3>
                             <p className="text-white/40 font-bold uppercase tracking-widest text-[10px] mt-2 leading-relaxed">Generated playlists will appear here for quick access</p>
                         </div>
-                        <button className="bg-violet-600 hover:bg-violet-500 text-white font-black px-10 py-4 rounded-full uppercase tracking-[0.2em] text-xs transition-all shadow-[0_15px_40px_rgba(139,92,246,0.3)]">Create First Vibe</button>
+                        <button onClick={onCreateFirstVibe} className="bg-violet-600 hover:bg-violet-500 text-white font-black px-10 py-4 rounded-full uppercase tracking-[0.2em] text-xs transition-all shadow-[0_15px_40px_rgba(139,92,246,0.3)]">Create First Vibe</button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
