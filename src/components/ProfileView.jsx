@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 
-const ProfileView = ({ currentVibe: initialVibe = "Joy" }) => {
+const ProfileView = ({ currentVibe: initialVibe = "Joy", recentPlaylists = [], userPlaylists = [], onPlaylistSelect, onBack }) => {
     const [viewVibe, setViewVibe] = useState(initialVibe);
-    const [activeTab, setActiveTab] = useState('profile'); 
+    const [activeTab, setActiveTab] = useState('recent'); 
     const [showMoodToggle, setShowMoodToggle] = useState(false);
     
     const themeMap = {
@@ -74,7 +74,7 @@ const ProfileView = ({ currentVibe: initialVibe = "Joy" }) => {
                         <div className="flex space-x-4">
                             <div className="text-center md:text-left">
                                 <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Playlists</p>
-                                <p className="text-2xl font-black text-white">24</p>
+                                <p className="text-2xl font-black text-white">{userPlaylists.length}</p>
                             </div>
                             <div className="text-center md:text-left">
                                 <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Genius Score</p>
@@ -114,32 +114,55 @@ const ProfileView = ({ currentVibe: initialVibe = "Joy" }) => {
             {/* Tabs */}
             <div className="px-8 mt-12 pb-24">
                 <div className="flex space-x-12 border-b border-white/5 mb-10 overflow-x-auto scrollbar-hide">
-                    {['profile', 'emotional'].map(tab => (
+                    {['recent', 'emotional'].map(tab => (
                         <button 
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`pb-4 text-sm font-black uppercase tracking-[0.3em] transition-all relative ${activeTab === tab ? 'text-white' : 'text-white/20 hover:text-white/40'}`}
                         >
-                            {tab === 'profile' ? 'Artist Affinity' : 'Emotional Profile'}
+                            {tab === 'recent' ? 'Recent Vibes' : 'Emotional Profile'}
                             {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-cyan-400 rounded-full shadow-[0_0_15px_rgba(34,211,238,0.5)]"></div>}
                         </button>
                     ))}
                 </div>
 
-                {activeTab === 'profile' ? (
+                {activeTab === 'recent' ? (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-8">Frequent Artists</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
-                            {[1, 2, 3, 4, 5, 6].map((i) => (
-                                <div key={i} className="group cursor-pointer">
-                                    <div className="aspect-square rounded-3xl bg-[#12121e] border border-white/5 mb-4 overflow-hidden shadow-2xl transition-all group-hover:scale-105 group-hover:rotate-2 group-hover:border-violet-500/50">
-                                        <img src={`https://picsum.photos/seed/artist${i}/300/300`} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" alt="" />
-                                    </div>
-                                    <p className="text-sm font-black text-white uppercase tracking-tight truncate">Artist {i}</p>
-                                    <p className="text-[10px] font-black text-violet-400 uppercase tracking-widest mt-1">Vibe Match 9{i}%</p>
-                                </div>
-                            ))}
+                        <div className="mb-8">
+                            <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-4">Recent Vibes</h3>
+                            {recentPlaylists.length === 0 && (
+                                <p className="text-white/50 text-sm italic">No recent sessions. Create your first vibe to see dynamic content here.</p>
+                            )}
                         </div>
+                        {recentPlaylists.length > 0 ? (
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-8">
+                                {recentPlaylists.map((playlist, i) => (
+                                    <div 
+                                        key={i}
+                                        className="group cursor-pointer"
+                                        onClick={() => onPlaylistSelect(playlist)}
+                                    >
+                                        <div className="aspect-square rounded-3xl bg-gradient-to-br from-violet-900/50 to-cyan-900/50 border border-white/10 mb-4 overflow-hidden shadow-2xl transition-all group-hover:scale-105 group-hover:rotate-2 group-hover:border-violet-500/50 group-hover:from-violet-800/70 group-hover:to-cyan-800/70">
+                                            <div className="w-16 h-16 ml-4 mt-4 rounded-2xl bg-white/20 backdrop-blur-xl flex items-center justify-center shadow-xl">
+                                                <span className={`w-8 h-8 rounded-xl shadow-lg ${playlist.emotion?.color || 'from-yellow-400 to-orange-400 bg-gradient-to-r'}`}></span>
+                                            </div>
+                                            <div className="absolute bottom-4 left-4 text-[10px] font-black text-white/80 uppercase tracking-wider">
+                                                {playlist.emotion?.name || 'Mixed'}
+                                            </div>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-sm font-black text-white uppercase tracking-tight mb-1">{playlist.emotion?.name || 'Vibe'} Mix</p>
+                                            <p className="text-[11px] text-white/70 truncate">{playlist.preview?.title || 'Preview not available'}</p>
+                                            <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest mt-1">{playlist.trackCount} tracks</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-16 opacity-50">
+                                <p className="text-lg font-black uppercase tracking-tight">Start your first session!</p>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in slide-in-from-bottom-4 duration-500">

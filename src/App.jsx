@@ -108,6 +108,12 @@ const App = () => {
         navigateTo('playlist');
     };
 
+    const recentPlaylists = userPlaylists.slice(0, 6).map(pl => ({
+        ...pl,
+        preview: pl.songs[0] || { title: 'No tracks', artist: 'Unknown' },
+        trackCount: pl.songs?.length || 0
+    }));
+
     const handleSearch = (query) => {
         setSearchQuery(query);
         if (query.trim().length > 0) {
@@ -170,7 +176,13 @@ const App = () => {
         );
 
         switch (view) {
-            case 'profile': return <ProfileView currentVibe={currentEmotion?.name || 'Joy'} onBack={goBack} />;
+            case 'profile': return <ProfileView 
+                currentVibe={currentEmotion?.name || 'Joy'} 
+                recentPlaylists={recentPlaylists}
+                userPlaylists={userPlaylists}
+                onPlaylistSelect={handleSelectSavedPlaylist}
+                onBack={goBack} 
+            />;
             case 'camera': return <CameraView onCapture={handleCapture} onClose={goBack} onError={setError}/>;
             case 'mic': return <AudioView onCapture={handleAudioCapture} onClose={goBack} onError={setError}/>;
             case 'playlist': return <PlaylistDisplay playlist={playlist} emotion={currentEmotion} onReset={handleReset}/>;
