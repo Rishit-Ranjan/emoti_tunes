@@ -1,92 +1,60 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const PlaylistDisplay = ({ playlist, emotion, onReset, onSave }) => {
+const PlaylistDisplay = ({ playlist, emotion, onRefresh }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [player, setPlayer] = useState(null);
     const [volume, setVolume] = useState(80);
+    const [currentError, setCurrentError] = useState(null);
     const playerRef = useRef(null);
+    const initAttempts = useRef(0);
+    const MAX_INIT_ATTEMPTS = 3;
 
-    const currentSong = playlist[currentIndex];
 
-    // Initialize YouTube API
-    useEffect(() => {
-        const loadYT = () => {
-            if (!window.YT) {
-                const tag = document.createElement('script');
-                tag.src = "https://www.youtube.com/iframe_api";
-                const firstScriptTag = document.getElementsByTagName('script')[0];
-                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-                window.onYouTubeIframeAPIReady = () => initPlayer();
-            } else if (window.YT.Player) {
-                initPlayer();
-            }
-        };
-
-        const initPlayer = () => {
-            if (playerRef.current) return;
-            setTimeout(() => {
-                const el = document.getElementById('youtube-player-container');
-                if (!el) return;
-                playerRef.current = new window.YT.Player('youtube-player-container', {
-                    height: '0', width: '0',
-                    videoId: currentSong?.youtubeId || '',
-                    playerVars: { 'playsinline': 1, 'controls': 0, 'autoplay': 1, 'mute': 0, 'origin': window.location.origin },
-                    events: {
-                        'onReady': (event) => {
-                            setPlayer(event.target);
-                            setDuration(event.target.getDuration());
-                            event.target.setVolume(volume);
-                            if (currentSong) event.target.playVideo();
-                        },
-                        'onStateChange': (event) => {
-                            if (event.data === window.YT.PlayerState.PLAYING) {
-                                setIsPlaying(true);
-                                setDuration(event.target.getDuration());
-                            } else if (event.data === window.YT.PlayerState.PAUSED) {
-                                setIsPlaying(false);
-                            } else if (event.data === window.YT.PlayerState.ENDED) {
-                                handleNext();
-                            }
-                        },
-                        'onError': () => handleNext()
-                    }
-                });
-            }, 100);
-        };
-        loadYT();
-        return () => { if (playerRef.current?.destroy) playerRef.current.destroy(); };
-    }, []);
-
-    useEffect(() => {
-        if (player && currentSong?.youtubeId) {
-            player.loadVideoById(currentSong.youtubeId);
-            setIsPlaying(true);
-        }
-    }, [currentIndex, player]);
-
-    useEffect(() => {
-        if (player?.setVolume) player.setVolume(volume);
-    }, [volume, player]);
-
-    useEffect(() => {
-        let interval;
-        if (isPlaying && player) {
-            interval = setInterval(() => setCurrentTime(player.getCurrentTime()), 1000);
-        }
-        return () => clearInterval(interval);
-    }, [isPlaying, player]);
 
     const togglePlayPause = () => {
-        if (!player) return;
-        if (player.getPlayerState() === window.YT.PlayerState.PLAYING) player.pauseVideo();
-        else player.playVideo();
+        if (!player) {
+            initPlayer(); // Retry init
+            return;
+        }
+        try {
+            const state = player.getPlayerState();
+            if (state === window.YT.PlayerState.PLAYING) {
+                player.pauseVideo();
+            } else {
+                player.playVideo();
+            }
+        } catch (err) {
+            console.error('Play/pause error:', err);
+        }
     };
 
-    const handleNext = () => currentIndex < playlist.length - 1 ? setCurrentIndex(currentIndex + 1) : setIsPlaying(false);
-    const handlePrev = () => currentIndex > 0 && setCurrentIndex(currentIndex - 1);
+    const retryCurrentSong = () => {
+        setCurrentError(null);
+        initAttempts.current = 0;
+        if (player) {
+            player.loadVideoById(currentSong.youtubeId);
+        }
+    };
+
+    const handleNext = () => {
+        setCurrentError(null);
+        if (currentIndex < playlist.length - 1) {
+            setCurrentIndex(currentIndex + 1);
+        } else {
+            setIsPlaying(false);
+        }
+    };
+
+    const handlePrev = () => {
+        setCurrentError(null);
+        if (currentIndex > 0) {
+            setCurrentIndex(currentIndex - 1);
+        }
+    };
+
     const handleSeek = (e) => {
         const time = Number(e.target.value);
         setCurrentTime(time);
@@ -100,104 +68,69 @@ const PlaylistDisplay = ({ playlist, emotion, onReset, onSave }) => {
     };
     const getAlbumArt = (song, idx) => `https://picsum.photos/seed/${encodeURIComponent(song?.title || "vibe" + (idx || 0))}/300/300`;
 
+    const getYouTubeLink = (song) => song?.youtubeId ? `https://youtube.com/watch?v=${song.youtubeId}` : null;
+    const getSpotifyLink = (song) => `https://open.spotify.com/search/${encodeURIComponent(song?.title + ' ' + (song?.artist || ''))}`;
+
+    const handleRefresh = () => {
+        if (onRefresh) onRefresh(emotion);
+    };
+
     return (
-        <div className="flex-1 w-full h-full bg-[#0a0a12] flex flex-col font-sans text-white overflow-hidden animate-in fade-in duration-700 relative">
-            <div className="absolute -top-[9999px] -left-[9999px] opacity-0 pointer-events-none"><div id="youtube-player-container"></div></div>
-
-            <div className="flex-1 overflow-y-auto pb-44 scrollbar-hide">
-                <div className={`pt-32 pb-12 px-10 bg-gradient-to-b ${emotion?.gradient || 'from-violet-500/10 to-[#0a0a12]'} to-[#0a0a12]/0 flex items-end space-x-10 relative`}>
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-3xl pointer-events-none"></div>
-                    <div className="w-56 h-56 md:w-72 md:h-72 shadow-[0_30px_90px_rgba(0,0,0,0.9)] bg-[#1a1a2e] relative z-10 flex-shrink-0 group overflow-hidden rounded-[2.5rem] border border-white/10 ring-1 ring-white/5">
-                        <img src={getAlbumArt(currentSong, 99)} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"/>
-                        {!isPlaying && <div className="absolute inset-0 bg-black/40 flex items-center justify-center animate-pulse"><svg className="w-24 h-24 text-white/50" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>}
+        <div className="flex flex-col h-full">
+            <div className="pt-8 pb-6 px-8 md:px-12 flex items-center justify-between border-b border-white/5">
+                <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-xl ${emotion?.color || 'bg-violet-600'}`}>
+                        <emotion.icon size={24} />
                     </div>
-                    <div className="relative z-10 pb-4">
-                        <p className="uppercase text-sm font-black tracking-[0.4em] text-cyan-400 mb-4 animate-pulse">Intelligence Verified</p>
-                        <h1 className="text-7xl md:text-[6rem] font-black text-white mb-6 tracking-tighter leading-none drop-shadow-2xl uppercase selection:bg-cyan-500">{emotion?.name || 'Vibe'}</h1>
-                        <div className="flex items-center space-x-4 text-sm font-black text-white/80">
-                            <div className="w-8 h-8 bg-violet-600 rounded-full flex items-center justify-center p-1.5 ring-2 ring-white/10"><img src="/logo.png" className="w-full h-full rounded-full" alt="" /></div>
-                            <span className="hover:text-cyan-400 cursor-pointer uppercase tracking-widest transition-colors font-black">EmotiTunes Protocol</span>
-                            <span className="text-white/50 tracking-widest uppercase">• {playlist.length} Sonic Elements</span>
-                        </div>
+                    <div>
+                        <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-white leading-none">{emotion?.name || 'Vibe Playlist'}</h1>
+                        <p className="text-xs font-black uppercase tracking-[0.3em] text-violet-400">{playlist.length} Sonic Elements</p>
                     </div>
                 </div>
-
-                <div className="px-10 bg-gradient-to-b from-black/20 to-[#0a0a12] pt-8 min-h-screen">
-                    <div className="flex items-center space-x-10 mb-12">
-                        <button onClick={togglePlayPause} className="w-20 h-20 rounded-3xl bg-white hover:bg-cyan-400 transition-all text-black flex items-center justify-center shadow-[0_20px_50px_rgba(255,255,255,0.15)] active:scale-90 group">
-                            {isPlaying ? <svg viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg> : <svg viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 ml-1"><path d="M8 5v14l11-7z"/></svg>}
-                        </button>
-                       
-                    </div>
-
-                    <div className="grid grid-cols-[45px_2fr_3fr] md:grid-cols-[45px_4fr_3fr_1fr] gap-7 px-10 py-6 border-b border-white/5 text-sm font-black tracking-[0.4em] text-white/70 uppercase mb-8">
-                        <div>#</div><div>Track Origin</div><div className="hidden md:block">Sonic Profile</div><div className="text-right">Interval</div>
-                    </div>
-                    <div className="space-y-3 px-2">
-                        {playlist.map((song, index) => {
-                            const isCurrentlyPlaying = index === currentIndex;
-                            return (
-                                <div key={index} onClick={() => setCurrentIndex(index)} className={`group grid grid-cols-[40px_1fr_1fr] md:grid-cols-[40px_4fr_3fr_1fr] gap-8 px-6 py-4 rounded-[2rem] hover:bg-white/5 transition-all cursor-pointer items-center border border-transparent hover:border-white/10 ${isCurrentlyPlaying ? 'bg-white/5 border-white/10 shadow-2xl' : ''}`}>
-                                    <div className="text-center font-black">
-                                        {isCurrentlyPlaying && isPlaying ? <div className="flex justify-center space-x-1 h-4"><div className="w-1 bg-cyan-400 animate-bounce"></div><div className="w-1 bg-violet-400 animate-bounce delay-150"></div><div className="w-1 bg-cyan-400 animate-bounce delay-300"></div></div> : <span className={`text-[11px] ${isCurrentlyPlaying ? 'text-cyan-400' : 'text-white/70'}`}>{index + 1}</span>}
-                                    </div>
-                                    <div className="flex items-center min-w-0">
-                                        <div className="w-14 h-14 bg-[#1a1a2e] flex-shrink-0 mr-6 rounded-2xl shadow-xl overflow-hidden group-hover:rotate-6 transition-transform"><img src={getAlbumArt(song, index)} alt="" className="w-full h-full object-cover opacity-80 group-hover:opacity-100" /></div>
-                                        <div className="truncate"><div className={`font-black text-2xl truncate tracking-tighter ${isCurrentlyPlaying ? 'text-cyan-400' : 'text-white'}`}>{song.title}</div><div className="text-sm font-black text-white/70 truncate uppercase tracking-widest mt-1 group-hover:text-cyan-400/50 transition-colors">{song.artist}</div></div>
-                                    </div>
-                                    <div className="hidden md:block text-sm font-black text-white/50 truncate uppercase tracking-widest italic group-hover:text-white/40 transition-colors">Adaptive Studio Mix</div>
-                                    <div className="text-right text-[11px] font-black text-white/70 tabular-nums">3:42</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+                <button 
+                    onClick={handleRefresh}
+                    className="group flex items-center space-x-2 px-6 py-3 bg-white/5 backdrop-blur-sm hover:bg-white/10 border border-white/20 hover:border-cyan-400 rounded-2xl text-sm font-black uppercase tracking-[0.2em] text-white hover:text-cyan-400 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_30px_rgba(34,211,238,0.2)] transition-all duration-300 hover:scale-[1.05] active:scale-95"
+                    title="Generate New Playlist"
+                >
+                    <svg className="w-4 h-4 group-hover:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>New Vibe</span>
+                </button>
             </div>
 
-            {/* Premium Floating Player */}
-            <div className="fixed bottom-8 left-8 right-8 md:left-[21.5rem] h-28 bg-[#0a0a12]/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] px-12 flex items-center justify-between z-50 shadow-[0_40px_120px_rgba(0,0,0,0.9)] animate-in slide-in-from-bottom-20 duration-1000">
-                <div className="flex-[0.35] flex items-center min-w-0">
-                    <div className="w-16 h-16 md:w-20 md:h-20 bg-[#1a1a2e] flex-shrink-0 mr-5 rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden group relative ring-1 ring-white/5">
-                        <img src={getAlbumArt(currentSong, currentIndex)} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform cursor-pointer" />
-                    </div>
-                    <div className="truncate pr-6 text-left">
-                        <div className="text-lg md:text-2xl font-black truncate uppercase tracking-tighter hover:text-cyan-400 cursor-pointer transition-colors leading-none mb-1 md:mb-2">{currentSong?.title}</div>
-                        <div className="text-sm font-black text-white/60 uppercase tracking-[0.3em] truncate">{currentSong?.artist}</div>
-                    </div>
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-4">
+                <div className="grid grid-cols-[40px_1fr_1fr] md:grid-cols-[40px_3fr_2fr_140px] gap-6 text-sm font-black uppercase tracking-[0.3em] text-white/50 mb-6">
+                    <div>#</div>
+                    <div>Title</div>
+                    <div className="hidden md:block">Artist</div>
+                    <div className="text-right">Listen</div>
                 </div>
-
-                <div className="flex-1 flex flex-col items-center max-w-xl">
-                    <div className="flex items-center space-x-12 mb-4">
-                            <button onClick={handlePrev} className="text-white/60 hover:text-cyan-400 transition-all active:scale-75 disabled:opacity-5 group" disabled={currentIndex === 0}>
-                            <svg fill="currentColor" viewBox="0 0 16 16" className="w-7 h-7 group-hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]"><path d="M3.3 1a.7.7 0 01.7.7v5.15l9.95-5.744a.7.7 0 011.05.606v12.575a.7.7 0 01-1.05.607L4 9.149V14.3a.7.7 0 01-1.4 0V1.7a.7.7 0 01.7-.7z"/></svg>
-                        </button>
-                        <button onClick={togglePlayPause} className="w-14 h-14 rounded-[1.2rem] bg-white text-black flex items-center justify-center hover:scale-110 hover:bg-cyan-400 active:scale-95 transition-all shadow-2xl">
-                            {isPlaying ? <svg fill="currentColor" viewBox="0 0 16 16" className="w-8 h-8"><path fillRule="evenodd" d="M2.7 1a.7.7 0 00-.7.7v12.6a.7.7 0 00.7.7h2.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7H2.7zm8 0a.7.7 0 00-.7.7v12.6a.7.7 0 00.7.7h2.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7h-2.6z"/></svg> : <svg fill="currentColor" viewBox="0 0 16 16" className="w-8 h-8 ml-1"><path d="M3 1.713a.7.7 0 011.05-.607l10.89 6.288a.7.7 0 010 1.212L4.05 14.894A.7.7 0 013 14.288V1.713z"/></svg>}
-                        </button>
-                        <button onClick={handleNext} className="text-white/60 hover:text-cyan-400 transition-all active:scale-75 disabled:opacity-5 group" disabled={currentIndex === playlist.length - 1}>
-                            <svg fill="currentColor" viewBox="0 0 16 16" className="w-7 h-7 group-hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]"><path d="M12.7 1a.7.7 0 00-.7.7v5.15L2.05 1.107A.7.7 0 001 1.712v12.575a.7.7 0 001.05.607L12 9.149V14.3a.7.7 0 001.4 0V1.7a.7.7 0 00-.7-.7z"/></svg>
-                        </button>
-                    </div>
-                    
-                    <div className="w-full flex items-center space-x-6 text-sm font-black tracking-[0.2em] text-white/60">
-                        <span className="w-12 text-right tabular-nums">{formatTime(currentTime)}</span>
-                        <div className="flex-1 relative group h-1 bg-white/5 rounded-full overflow-hidden">
-                           <div className="absolute top-0 left-0 h-full bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]" style={{ width: `${(currentTime / (duration || 210)) * 100}%` }}></div>
-                           <input type="range" min="0" max={duration || 210} value={currentTime || 0} onChange={handleSeek} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
-                        </div>
-                        <span className="w-12 text-left tabular-nums">{formatTime(duration)}</span>
-                    </div>
-                </div>
-
-                <div className="flex-[0.35] hidden md:flex justify-end items-center text-white/60 space-x-8 pr-4">
-                    <div className="flex items-center space-x-4 group w-44">
-                        <svg className="w-6 h-6 group-hover:text-cyan-400 transition-colors" fill="currentColor" viewBox="0 0 16 16"><path d="M11.536 14.01A8.473 8.473 0 0 0 14.026 8a8.473 8.473 0 0 0-2.49-6.01l-.708.707A7.478 7.478 0 0 1 13.025 8c0 1.847-.665 3.538-1.766 4.852l.707.707z"/><path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.483 5.483 0 0 1 11.025 8a5.483 5.483 0 0 1-1.611 3.889l.707.707z"/><path d="M10.025 8a1.99 1.99 0 0 1-2.43 1.944L1 4h5.21l.363-.29A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06z"/></svg>
-                        <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden relative border border-white/5 shadow-inner">
-                            <div className="absolute top-0 left-0 h-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)] transition-all duration-300" style={{ width: `${volume}%` }}></div>
-                            <input type="range" min="0" max="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
+                
+                {playlist.map((song, index) => (
+                    <div key={index} className="group bg-white/5 backdrop-blur-sm hover:bg-white/10 border border-white/10 hover:border-cyan-400/50 rounded-2xl p-6 md:p-8 transition-all duration-300 hover:shadow-[0_10px_40px_rgba(0,0,0,0.3)] hover:scale-[1.02] cursor-pointer">
+                        <div className="grid grid-cols-[40px_1fr_1fr_140px] md:gap-8 items-center h-full">
+                            <div className="text-center font-black text-xl text-cyan-400">{index + 1}</div>
+                            <div className="space-y-1">
+                                <div className="text-xl md:text-2xl font-black text-white truncate leading-tight">{song.title}</div>
+                                <div className="text-xs font-black uppercase tracking-wider text-violet-300">{song.artist}</div>
+                            </div>
+                            <div className="text-xs font-black text-white/60 uppercase tracking-wider truncate">AI Vibe Match</div>
+                            <div className="flex space-x-3 justify-end">
+                                {getYouTubeLink(song) && (
+                                    <a href={getYouTubeLink(song)} target="_blank" rel="noopener noreferrer" className="group/link flex items-center space-x-1 px-4 py-2.5 bg-gradient-to-r from-red-600/20 to-red-500/20 backdrop-blur-sm border border-red-400/30 hover:border-red-400 hover:from-red-600/40 hover:to-red-500/40 text-xs font-black uppercase tracking-[0.2em] text-white hover:text-red-200 shadow-[0_4px_20px_rgba(239,68,68,0.2)] hover:shadow-[0_8px_30px_rgba(239,68,68,0.3)] transition-all duration-300 hover:scale-105 active:scale-95 rounded-xl" title={`YouTube: ${song.title}`}>
+                                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.433L15.818 12zm-1.36-7.415L15.818 12 8.185 15.568V8.153z"/></svg>
+                                        <span>Play</span>
+                                    </a>
+                                )}
+                                <a href={getSpotifyLink(song)} target="_blank" rel="noopener noreferrer" className="group/link flex items-center px-4 py-2.5 bg-gradient-to-r from-green-600/20 to-green-500/20 backdrop-blur-sm border border-green-400/30 hover:border-green-400 hover:from-green-600/40 hover:to-green-500/40 text-xs font-black uppercase tracking-[0.2em] text-white hover:text-green-200 shadow-[0_4px_20px_rgba(34,197,94,0.2)] hover:shadow-[0_8px_30px_rgba(34,197,94,0.3)] transition-all duration-300 hover:scale-105 active:scale-95 rounded-xl" title={`Spotify: ${song.title}`}>
+                                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.5 17.3c-.2.3-.5.4-.8.2-2.7-1.7-6.2-2.1-10.2-1.2-.4.1-.7-.2-.8-.5-.1-.4.2-.7.5-.8 4.3-1 8.2-.5 11.3 1.4.3.2.4.6.2.9zm1.5-3.3c-.3.4-.8.5-1.2.3-3.1-1.9-7.8-2.5-11.5-1.3-.5.1-1-.2-1.1-.7-.1-.5.2-1 .7-1.1 4.2-1.3 9.4-.6 13 1.6.4.2.5.8.1 1.2zm.1-3.4C15.1 8.2 8.4 8 4.5 9.2c-.6.2-1.2-.2-1.4-.7-.2-.6.2-1.2.7-1.4 4.4-1.3 11.7-1.1 16.3 1.6.5.3.7 1 .4 1.5-.3.5-1 .7-1.5.4z"/>
+                                    </svg>
+                                    <span>Spotify</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
-                </div>
+                ))}
             </div>
         </div>
     );

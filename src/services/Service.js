@@ -183,11 +183,22 @@ Ensure youtubeId is accurate. No conversational text.`;
             const text = await response.text();
             
             const jsonText = cleanJsonString(text);
-            const parsed = JSON.parse(jsonText);
+            let parsed;
+            try {
+                parsed = JSON.parse(jsonText);
+            } catch (parseErr) {
+                console.error('JSON Parse error:', parseErr.message);
+                console.log('Raw response snippet:', text.substring(0, 200));
+                continue; // Try next model
+            }
             
             if (parsed && (parsed.songs || Array.isArray(parsed))) {
                 console.log(`✅ Intelligence Link Established: ${modelName}`);
-                return parsed.songs || parsed;
+                // Filter valid songs
+                const validSongs = (parsed.songs || parsed).filter(song => 
+                    song && song.title && song.youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(song.youtubeId)
+                );
+                return validSongs.length > 0 ? validSongs : parsed.songs || parsed;
             }
         } catch (error) {
             console.error(`❌ Model ${modelName} Connection Failed:`, error.message);
